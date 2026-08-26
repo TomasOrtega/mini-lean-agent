@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-lean-agent"
+version = "0.1.0"
+description = "A minimal, reproducible agent baseline for Lean theorem-proving tasks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Tomas Ortega", email = "tomaso@uci.edu" },
+]
+keywords = ["lean", "lean4", "theorem-proving", "agents", "llm", "formalization"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "litellm>=1.75.5,!=1.82.7,!=1.82.8",
+  "rich>=13.9",
+  "typer>=0.15",
+]
+
+[project.optional-dependencies]
+kimina = ["kimina-client>=0.1"]
+dev = [
+  "build>=1.2",
+  "mypy>=1.15",
+  "pre-commit>=4.0",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.11",
+  "twine>=6.0",
+]
+docs = [
+  "mkdocs-material>=9.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/TomasOrtega/mini-lean-agent"
+Documentation = "https://tomasortega.github.io/mini-lean-agent/"
+Repository = "https://github.com/TomasOrtega/mini-lean-agent"
+Issues = "https://github.com/TomasOrtega/mini-lean-agent/issues"
+
+[project.scripts]
+mini-lean = "minileanagent.cli:app"
+mini-lean-agent = "minileanagent.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["minileanagent*"]
+
+[tool.setuptools.package-data]
+minileanagent = ["py.typed"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["minileanagent"]
+branch = true
+omit = ["src/minileanagent/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 85
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["minileanagent"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["litellm", "kimina_client"]
+ignore_missing_imports = true

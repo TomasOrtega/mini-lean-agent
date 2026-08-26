@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible problem in mini-lean-agent
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, private source code, or unredacted trajectories.
+  - type: input
+    id: version
+    attributes:
+      label: mini-lean-agent version or commit
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system, Python, and Lean versions
+    validations:
+      required: true
+  - type: dropdown
+    id: toolset
+    attributes:
+      label: Toolset
+      options: [bash, lean]
+    validations:
+      required: true
+  - type: dropdown
+    id: checker
+    attributes:
+      label: Checker backend
+      options: [local, kimina]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include commands and a small public project when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

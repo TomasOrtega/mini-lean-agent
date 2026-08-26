@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a change or an optional research extension
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Research or user problem
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Effect on the minimal baseline
+      description: Explain whether this belongs in the core, an optional module, or a downstream project.
+    validations:
+      required: true
+  - type: textarea
+    id: evaluation
+    attributes:
+      label: Suggested evaluation or ablation

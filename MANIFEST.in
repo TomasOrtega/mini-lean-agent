@@ -1,0 +1,17 @@
+include AGENTS.md
+include CHANGELOG.md
+include CITATION.cff
+include CONTRIBUTING.md
+include LICENSE
+include Makefile
+include NOTICE.md
+include README.md
+include RELEASING.md
+include SECURITY.md
+include mkdocs.yml
+recursive-include docs *
+recursive-include examples *
+recursive-include tests *.py
+global-exclude *.py[cod]
+global-exclude __pycache__
+global-exclude .DS_Store

@@ -18,7 +18,9 @@ def recursive_merge(*dictionaries: Mapping[str, Any] | None) -> dict[str, Any]:
     os.environ.setdefault("MSWEA_SILENT_STARTUP", "1")
     from minisweagent.utils.serialize import recursive_merge as upstream_recursive_merge
 
-    normalized = [dict(dictionary) if dictionary is not None else None for dictionary in dictionaries]
+    normalized = [
+        dict(dictionary) if dictionary is not None else None for dictionary in dictionaries
+    ]
     return cast(dict[str, Any], upstream_recursive_merge(*normalized))
 
 

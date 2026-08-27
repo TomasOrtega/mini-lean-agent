@@ -1,14 +1,10 @@
-# Toolsets
+# Tool interface
 
-mini-lean-agent exposes two controlled toolsets.
+The default baseline exposes exactly one model-visible tool:
 
-## `bash`
+- `bash(command)` from mini-SWE-agent
 
-Model-visible tools:
-
-- `bash(command)`
-
-The model interacts with Lean through ordinary commands such as:
+The model interacts with Lean through ordinary commands:
 
 ```bash
 lake env lean Main.lean
@@ -20,54 +16,18 @@ LEAN
 lake env lean Scratch.lean
 ```
 
-This is the closest analogue of mini-SWE-agent. Bash is a universal interface and the scaffold does
-not decide what constitutes theorem search, inspection, editing, or checking.
+The scaffold does not decide what counts as theorem search, inspection, editing, or checking. This
+is the central comparability claim: the control flow and tool interface are mini-SWE-agent's, with a
+Lean prompt and evaluator around them.
 
-To finish, the model makes a `bash` call containing only:
+To request completion, the model runs:
 
 ```bash
 mini-lean-submit
 ```
 
-This uses the configured target. Without one, it supplies a project-relative file:
+This is an ordinary shell command, not an additional model tool. It reads the fixed target from the
+harness environment and accepts no target argument.
 
-```bash
-mini-lean-submit Main.lean
-```
-
-The environment intercepts this reserved command, verifies the file, and terminates only on a clean
-Lean check. It is part of the bash protocol, not an additional model-visible tool.
-
-## `lean`
-
-Model-visible tools:
-
-- `bash(command)`
-- `lean_check(path?, code?)`
-
-`lean_check` accepts exactly one of:
-
-- `path`: check a project-relative Lean file
-- `code`: check a complete Lean snippet written to an ephemeral project-local file
-
-The structured tool reduces boilerplate and makes verification events easier to identify in
-trajectories. It does not expose proof states or choose tactics.
-
-## Recommended ablation
-
-Hold fixed:
-
-- task checkout
-- model and sampling settings
-- prompts except tool descriptions
-- checker backend
-- step, cost, wall-time, timeout, and output limits
-- final success criterion
-
-Compare:
-
-1. `--toolset bash`
-2. `--toolset lean`
-
-Report success rate, model calls, cost, wall time, verifier calls, command failures, and the fraction
-of runs that reach a rejected submission before succeeding.
+Native `lean_check`, proof-state actions, Kimina, retrieval, and tactic search can be evaluated as
+future ablations. They are not part of the default package.

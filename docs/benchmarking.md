@@ -1,66 +1,33 @@
 # Batch evaluation
 
-## Task format
-
-A batch file is JSON Lines. Each nonempty line contains:
+A JSONL task has three required fields. `id` and `declaration` are optional, although declaration is
+recommended for benchmarks:
 
 ```json
-{
-  "id": "unique-task-id",
-  "task": "Natural-language instruction",
-  "project": "/absolute/or/expanded/project/path",
-  "target": "Main.lean"
-}
+{"id":"task-1","task":"Replace the sorry.","project":"/tmp/task-1","target":"Main.lean","declaration":"Example.main"}
 ```
 
-`target` is optional, but a path must eventually be supplied with `mini-lean-submit PATH.lean`.
+Relative project paths are resolved from the JSONL file's directory. Each project should be an
+isolated checkout.
 
-## Run
+Run:
 
 ```bash
 mini-lean batch tasks.jsonl \
-  --model "$MINI_LEAN_MODEL" \
-  --toolset bash \
-  --output-dir results/bash
+  --model "$MSWEA_MODEL_NAME" \
+  --output-dir results
 ```
 
-The initial batch runner is deliberately sequential. Parallel orchestration should create an
-isolated checkout per task and run independent CLI processes. This keeps the single-run control flow
-and trajectory semantics unchanged.
+The adapter is sequential on purpose. It creates one upstream mini-SWE-agent trajectory per task and
+appends a row to `results/summary.jsonl`.
 
-## Outputs
+For a comparable result, report:
 
-The output directory contains:
+- mini-lean-agent and mini-SWE-agent versions
+- repository commit and Lean toolchain
+- model identifier and provider
+- step, cost, wall-time, shell-timeout, and verification-timeout limits
+- whether a protected declaration was supplied
+- any evaluator applied beyond the built-in target check
 
-```text
-results.jsonl
-trajectories/
-  task-1.json
-  task-2.json
-```
-
-`results.jsonl` is suitable for aggregation. Trajectories retain the complete interaction for error
-analysis.
-
-## Fair comparisons
-
-A benchmark harness should freeze or record:
-
-- repository and dependency commits
-- Lean version
-- task statement and target file
-- model endpoint and exact identifier
-- temperature and output limit
-- toolset and checker backend
-- model-call, cost, wall-time, command-timeout, and output limits
-- whether theorem statements and imports may change
-- sandbox image and available shell programs
-
-Do not run two agents concurrently in the same working tree.
-
-## Source-level invariants
-
-A clean Lean check alone does not establish that an agent preserved the requested theorem statement.
-For benchmark-grade evaluation, inspect the final diff or use a task-specific wrapper supplied through
-`--lean-command` to reject changes to protected declarations, imports, axioms, or other files. The
-runner deliberately leaves these task-dependent rules outside the core agent.
+Large-scale parallel scheduling should wrap this adapter rather than alter the agent loop.

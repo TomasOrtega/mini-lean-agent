@@ -1,50 +1,43 @@
-# Verification backends
+# Verification
 
-## Local backend
+The verifier resolves one `.lean` target inside the selected project and runs:
 
-The local backend is the reference backend for repository tasks.
+- `lake env lean TARGET` when a Lake project is present
+- `lean TARGET` otherwise
+- a custom tokenized command when `--lean-command` is supplied
 
-The checker selects:
+A custom command may contain `{target}`. The verifier replaces that token with the project-relative
+file name. It never invokes an additional shell.
 
-- `lake env lean` when `lakefile.lean` or `lakefile.toml` exists
-- `lean` otherwise
+The result is rejected when:
 
-Override this with:
+- Lean returns a nonzero exit code
+- verification times out
+- the executable is unavailable
+- the target contains `sorry`, `admit`, or `sorryAx` outside comments and strings
+- Lean emits the standard warning that a declaration uses `sorry`
+- a protected declaration's elaborated type changed
 
-```bash
-mini-lean solve "..." --lean-command 'lake env lean'
-```
+Lean block comments can nest, so placeholder scanning uses a small lexer instead of a regular
+expression over raw source.
 
-The submitted path must stay inside the configured project root. The checker captures combined
-stdout and stderr, applies a per-call timeout, and truncates very long output by preserving its head
-and tail.
+## Declaration guard
 
-## Kimina backend
-
-Install the optional client:
-
-```bash
-python -m pip install 'mini-lean-agent[kimina]'
-```
-
-Start or connect to a Kimina Lean Server, then run:
+For benchmark tasks, pass a fully-qualified name:
 
 ```bash
-mini-lean solve \
-  "Prove the theorem in Main.lean." \
+mini-lean solve "Replace the sorry." \
   --project . \
   --target Main.lean \
-  --checker kimina \
-  --kimina-url http://localhost:8000
+  --declaration MyProject.main_theorem
 ```
 
-Kimina evaluates code in the server's configured Lean project. It is particularly useful for
-parallel checks of self-contained Mathlib snippets. Local repository imports will work only when the
-server has been configured for the same project and dependencies.
+Before the model starts, the harness appends a temporary `#check` command and records the elaborated
+type. It repeats the check after the run and compares normalized output. The temporary file is
+removed immediately after each check.
 
-## Soundness boundary
+## Boundary of the check
 
-The runner verifies only what Lean verifies under the selected project and toolchain. It does not
-attempt to impose a philosophical notion of allowed axioms beyond rejecting `sorry`/`admit` warnings.
-Benchmarks that forbid additional axioms, unsafe declarations, theorem-statement changes, or native
-code evaluation should add an external source audit and state those rules explicitly.
+Compilation, placeholder rejection, and one declaration guard do not guarantee that imports, other
+declarations, unrelated files, or axioms were unchanged. A benchmark can inspect the final diff and
+run additional task-specific evaluators while leaving the agent baseline unchanged.

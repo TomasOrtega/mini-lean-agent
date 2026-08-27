@@ -1,5 +1,5 @@
 site_name: mini-lean-agent
-site_description: A minimal, reproducible agent baseline for Lean theorem-proving tasks
+site_description: A thin Lean specialization of mini-SWE-agent
 site_url: https://tomasortega.github.io/mini-lean-agent/
 repo_url: https://github.com/TomasOrtega/mini-lean-agent
 repo_name: TomasOrtega/mini-lean-agent
@@ -9,10 +9,10 @@ nav:
   - Home: index.md
   - Quick start: quickstart.md
   - Design: design.md
-  - Toolsets: toolsets.md
-  - Verification backends: verification.md
-  - Batch evaluation: benchmarking.md
+  - Tool interface: toolsets.md
+  - Verification: verification.md
   - Trajectories: trajectories.md
+  - Batch evaluation: benchmarking.md
   - Security: security.md
   - Contributing: contributing.md
 

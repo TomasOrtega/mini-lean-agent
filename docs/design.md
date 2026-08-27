@@ -1,59 +1,43 @@
 # Design
 
-## Goal
+## Reuse rather than reimplementation
 
-mini-lean-agent is a baseline, not a claim that every Lean task should be solved by a minimal agent.
-The goal is to make the scaffold small enough that experiments can identify where gains come from.
+The runner directly constructs mini-SWE-agent's public components:
 
-## Linear control flow
+- `minisweagent.agents.default.DefaultAgent`
+- `minisweagent.environments.local.LocalEnvironment`
+- the model returned by `minisweagent.models.get_model`
 
-The complete loop is:
+The classes are not copied or subclassed. Ordinary model calls, bash actions, subprocess execution,
+limits, errors, and trajectory serialization therefore remain upstream behavior.
 
-```text
-initialize system and task messages
-while within the limits:
-    model_turn = model(messages, tool_schemas)
-    append model_turn
-    for tool_call in model_turn:
-        observation = environment.execute(tool_call)
-        append observation
-        stop only after a verified `mini-lean-submit` command
-```
+mini-lean-agent loads upstream `mini.yaml` and applies a small Lean prompt and environment overlay.
+It then injects the fixed project and target into the subprocess environment, asks the model to
+finish with `mini-lean-submit`, and independently evaluates the target after `DefaultAgent.run`
+returns.
 
-There is no hidden state summarizer, plan graph, subagent manager, theorem queue, retrieval index, or
-proof-tree search. The saved messages are the messages used by the model.
+## Why one bash tool
 
-## Stateless command execution
+Bash already lets a model edit files, run Lean, create scratch examples, inspect dependencies, and
+write helper scripts. Keeping the interface unchanged makes comparisons with mini-SWE-agent clear
+and keeps improvements attributable to the model rather than the scaffold.
 
-Each `bash` call starts a new process with the project root as its working directory. File edits
-persist. Shell state does not. This avoids long-lived shell corruption and makes it straightforward
-to replace the local process runner with a container or cluster execution backend.
+## Submission and evaluation
 
-## Verified termination
+`mini-lean-submit` reads the fixed target from environment variables supplied by the harness. It
+cannot accept a different target argument. It verifies the file and prints mini-SWE-agent's standard
+completion sentinel only when the check passes.
 
-A model cannot finish by merely claiming success. It must run `mini-lean-submit` through `bash`.
-The environment compiles the submitted file through the configured checker and looks for Lean's warning that a declaration uses
-`sorry`. A failed submission returns an ordinary observation and the model may continue.
+The submission command is a convenience boundary, not the final authority. After the upstream agent
+exits, `run_task` evaluates the configured target again. A model that directly prints the sentinel
+may end the upstream loop, but its mini-lean result is still a failure unless the target verifies.
 
-## Model interface
+When a fully-qualified declaration name is supplied, the runner records that declaration's
+elaborated type before the run and compares it with the final type. This rejects changes to the
+protected theorem statement without parsing Lean syntax in Python.
 
-The initial release uses native function/tool calling through LiteLLM. The model adapter is isolated
-in `models.py`; alternate adapters can preserve the same agent and trajectory format.
+## Trajectories
 
-A text-only protocol is a natural extension for models without reliable native tool calling. It
-should be introduced as a distinct protocol setting rather than silently changing the baseline.
-
-## Deliberate exclusions
-
-The core does not include:
-
-- Mathlib embedding retrieval
-- LeanDojo-style premise selection
-- tactic-state stepping
-- best-first or Monte Carlo search
-- proof decomposition
-- theorem-statement mutation
-- persistent memories
-- multiple agents
-
-These are valuable research directions. They should be evaluated as layers above the minimal runner.
+The agent writes mini-SWE-agent's trajectory schema. The final save adds one namespaced object at
+`info.mini_lean_agent` containing the target, versions, upstream exit status, and Lean verification
+result.

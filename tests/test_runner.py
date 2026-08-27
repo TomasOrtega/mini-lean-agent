@@ -10,7 +10,6 @@ from minileanagent import runner
 from minileanagent.runner import RunOutcome, UpstreamAPI
 
 
-
 def fake_lean_config() -> dict[str, Any]:
     """Representative upstream mini.yaml merged with the Lean overlay."""
     return {
@@ -154,7 +153,6 @@ def test_run_task_preserves_upstream_trajectory_and_adds_metadata(
     monkeypatch.setattr(runner, "_load_upstream", lambda: fake_upstream(seen))
     monkeypatch.setattr(runner, "load_config", lambda _: fake_lean_config())
     monkeypatch.setattr(runner, "installed_upstream_version", lambda: "2.4.6")
-    monkeypatch.setattr(runner, "load_config", lambda _: fake_lean_config())
     trajectory = tmp_path / "result.traj.json"
 
     outcome = runner.run_task(

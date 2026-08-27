@@ -1,15 +1,29 @@
 # Repository guide for coding agents
 
-mini-lean-agent is a deliberately small research baseline. Preserve the linear control flow and keep
-specialized orchestration out of the default agent.
+mini-lean-agent is a thin downstream specialization of mini-SWE-agent. Do not introduce a second
+agent loop, model adapter, shell implementation, trajectory schema, or tool-calling protocol.
 
-## Important files
+## Ownership boundary
 
-- `src/minileanagent/agent.py`: model → tool → observation loop and trajectory format
-- `src/minileanagent/environment.py`: shell, Lean checker, Kimina adapter, and submission verifier
-- `src/minileanagent/models.py`: LiteLLM adapter
-- `src/minileanagent/cli.py`: solve, check, doctor, inspect, and batch commands
-- `tests/`: network-free unit tests using fake models and fake Lean checkers
+Upstream mini-SWE-agent owns:
+
+- the agent loop and limits
+- model-provider handling
+- the bash tool
+- subprocess execution
+- trajectory serialization and inspection
+
+This repository owns:
+
+- `src/minileanagent/config/lean.yaml`: the Lean prompt
+- `src/minileanagent/verify.py`: fixed-target Lean evaluation
+- `src/minileanagent/submit.py`: verified completion through the upstream sentinel
+- `src/minileanagent/runner.py`: direct construction of upstream classes
+- `src/minileanagent/batch.py`: a small sequential JSONL adapter
+- `src/minileanagent/cli.py`: Lean-facing commands
+
+Native Lean tools, Kimina, retrieval, tactic environments, and proof search must remain explicit
+ablations rather than changes to the default baseline.
 
 ## Required checks
 
@@ -21,6 +35,4 @@ uv run pytest --cov=minileanagent
 uv build
 ```
 
-Do not add tests that require API keys, network access, Lean, or Kimina to the default CI job. Do not
-change theorem statements in examples merely to make proofs easier. Never commit generated
-trajectories, secrets, `.lake`, or model-provider responses containing private data.
+Never commit credentials, generated trajectories, `.lake`, or private proof corpora.

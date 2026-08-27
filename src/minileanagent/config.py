@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
 import yaml
 
-_CONFIG_RESOURCE = files("minileanagent").joinpath("config", "lean.yaml")
+_CONFIG_RESOURCE = files("minileanagent").joinpath("config").joinpath("lean.yaml")
 
 
-def recursive_merge(*dictionaries: dict[str, Any] | None) -> dict[str, Any]:
+def recursive_merge(*dictionaries: Mapping[str, Any] | None) -> dict[str, Any]:
     """Use mini-SWE-agent's merge semantics without importing it at module import time."""
     os.environ.setdefault("MSWEA_SILENT_STARTUP", "1")
     from minisweagent.utils.serialize import recursive_merge as upstream_recursive_merge
 
-    return cast(dict[str, Any], upstream_recursive_merge(*dictionaries))
+    normalized = [dict(dictionary) if dictionary is not None else None for dictionary in dictionaries]
+    return cast(dict[str, Any], upstream_recursive_merge(*normalized))
 
 
 def load_mapping(path: Path | str) -> dict[str, Any]:

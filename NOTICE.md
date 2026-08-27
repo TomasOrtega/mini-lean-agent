@@ -1,15 +1,11 @@
-# Notice and attribution
+# Third-party notice
 
-mini-lean-agent is an independent implementation by Tomas Ortega.
+mini-lean-agent is a downstream Lean specialization of
+[mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent).
 
-Its minimal-agent philosophy is inspired by the open-source
-[mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent) project from the SWE-agent team:
-a linear history, stateless shell actions, small control flow, and trajectory-first evaluation.
-No mini-SWE-agent source code is vendored in this repository.
+mini-SWE-agent is distributed under the MIT License.
 
-Optional verification integrates with
-[Kimina Lean Server](https://github.com/project-numina/kimina-lean-server), an independent MIT-licensed
-project from Project Numina. Kimina is not bundled with mini-lean-agent.
+Copyright © 2025 Kilian A. Lieret and Carlos E. Jimenez
 
-Lean is developed by the Lean community. Mathlib is maintained by the Lean mathematical library
-community. Neither project endorses mini-lean-agent.
+This repository imports mini-SWE-agent as a Python dependency. It does not vendor or relicense the
+upstream source. The mini-SWE-agent package retains its own copyright and license notices.

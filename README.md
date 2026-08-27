@@ -2,42 +2,45 @@
   <img src="https://raw.githubusercontent.com/TomasOrtega/mini-lean-agent/main/docs/assets/banner.svg" alt="mini-lean-agent" width="760" />
 </div>
 
-# The minimal Lean agent baseline
+# mini-lean-agent
 
 [![CI](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://tomasortega.github.io/mini-lean-agent/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/pypi/pyversions/mini-lean-agent.svg)](https://pypi.org/project/mini-lean-agent/)
 
-**mini-lean-agent** is a small, reproducible baseline for Lean 4 theorem-proving and
-formalization tasks. It keeps the scaffold deliberately simple so that improvements can be
-attributed to the model, training method, or tool interface rather than a large orchestration
-system.
+**mini-lean-agent is mini-SWE-agent specialized for Lean.** It imports mini-SWE-agent's agent loop,
+model support, bash tool, local subprocess environment, limits, and trajectory format. This
+repository adds only a Lean prompt, fixed-target verification, a verified submission command, and a
+small JSONL adapter.
 
-The design is inspired by [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent):
+The default baseline has exactly one model-visible tool:
 
-- one linear message history
-- one fresh subprocess per shell action
-- no hidden planner, memory database, proof search tree, or hand-written tactic policy
-- complete JSON trajectories for debugging, fine-tuning, and RL
-- an installable CLI and batch runner
+```text
+language model
+     │
+     │ bash
+     ▼
+mini-SWE-agent LocalEnvironment
+     │
+     ├── inspect and edit files
+     ├── search the project and Mathlib
+     ├── run Lean
+     └── run mini-lean-submit
+              │
+              ▼
+       fixed-target verifier
+```
 
-The Lean-specific question is made into an explicit ablation:
-
-| Toolset | Model-visible tools | Purpose |
-|---|---|---|
-| `bash` | `bash` | Strict mini-SWE-style baseline. Lean is used through shell commands. |
-| `lean` | `bash`, `lean_check` | Adds one structured incremental-verification tool. |
-
-The default is `bash`. Report both whenever the effect of specialized Lean tool use matters.
+There is no second agent loop, model wrapper, shell implementation, trajectory schema, hidden
+planner, tactic policy, retrieval service, or proof tree in this repository.
 
 > [!WARNING]
-> The model can execute arbitrary shell commands in the selected project. Use a disposable
-> checkout, container, VM, or other sandbox for untrusted models and tasks.
+> The model receives shell access through mini-SWE-agent. Run it in an isolated checkout, container,
+> VM, or another sandbox. The Lean verifier is an evaluator, not a security sandbox.
 
-## Quick start
+## Installation
 
-Install from the repository:
+From source:
 
 ```bash
 git clone https://github.com/TomasOrtega/mini-lean-agent.git
@@ -45,161 +48,145 @@ cd mini-lean-agent
 python -m pip install -e .
 ```
 
-After the first PyPI release, the same CLI is available without a persistent installation:
+The package pins mini-SWE-agent 2.4.6 exactly so a mini-lean-agent release has a reproducible
+agent scaffold. The packaged Lean YAML is applied as an overlay on upstream `mini.yaml`, and every
+trajectory records the installed and runtime upstream versions.
+
+## Run one task
+
+Set a model supported by mini-SWE-agent:
 
 ```bash
-uvx mini-lean-agent --help
+export MSWEA_MODEL_NAME='openrouter/<provider>/<model>'
+export OPENROUTER_API_KEY='...'
 ```
 
-Configure a tool-calling model supported by LiteLLM. For example, with OpenRouter:
-
-```bash
-export OPENROUTER_API_KEY=...
-export MINI_LEAN_MODEL='openrouter/<provider>/<model>'
-```
-
-Run the agent in an existing Lean project:
-
-```bash
-mini-lean solve \
-  "Replace the sorry in Main.lean without changing the theorem statement." \
-  --project /path/to/project \
-  --target Main.lean
-```
-
-Run the strict bash-only baseline:
+Run the agent on a fixed target:
 
 ```bash
 mini-lean solve \
-  "Prove the theorem in Main.lean." \
-  --project /path/to/project \
-  --target Main.lean \
-  --toolset bash
+  "Replace the sorry in MiniLeanExample.lean." \
+  --project examples/core \
+  --target MiniLeanExample.lean \
+  --declaration and_comm_example
 ```
 
-Check the environment before an expensive run:
+The optional `--declaration` argument is strongly recommended for benchmark runs. Before the model
+starts, mini-lean-agent records the declaration's elaborated type. After the run, it verifies that
+the type is unchanged.
+
+The model uses ordinary shell commands such as:
 
 ```bash
-mini-lean doctor --project /path/to/project
-mini-lean check Main.lean --project /path/to/project
+rg "Finset.sum_congr" .lake/packages/mathlib/Mathlib
+lake env lean MiniLeanExample.lean
+cat > Scratch.lean <<'EOF'
+import Mathlib
+#check Finset.sum_congr
+EOF
+lake env lean Scratch.lean
 ```
 
-Every run writes a trajectory under `.mini-lean-agent/trajectories/` unless `--trajectory`
-is provided:
+When the proof is complete, the model runs:
 
 ```bash
-mini-lean inspect .mini-lean-agent/trajectories/<run>.json --full
+mini-lean-submit
 ```
 
-## Control flow
+That command checks the fixed target and emits mini-SWE-agent's standard completion sentinel only on
+success. The harness independently checks the artifact again after the upstream agent exits, so
+directly printing the sentinel cannot produce a successful mini-lean result.
+
+## Verify without running a model
+
+```bash
+mini-lean check MiniLeanExample.lean \
+  --project examples/core
+```
+
+Lake projects use `lake env lean TARGET`. Other directories use `lean TARGET`. Unusual projects can
+supply a tokenized command template:
+
+```bash
+mini-lean check Main.lean \
+  --project . \
+  --lean-command 'python scripts/check.py {target}'
+```
+
+The verifier rejects compiler failures, timeouts, missing executables, and `sorry`, `admit`, or
+`sorryAx` outside comments and strings. It also rejects Lean's standard warning that a declaration
+uses `sorry`.
+
+## Trajectories
+
+The output remains an ordinary mini-SWE-agent trajectory. By default it is stored at:
 
 ```text
-system prompt + Lean task
-          │
-          ▼
-        model
-          │ tool call
-          ▼
- ┌─────────────────────┐
- │ bash                │  fresh subprocess, persistent files
- │ lean_check          │  optional structured verifier
- │ mini-lean-submit    │  reserved bash command, final verifier
- └─────────────────────┘
-          │ observation
-          └──────────────► append to the same linear history
+<project>/.mini-lean-agent/trajectories/<timestamp>.traj.json
 ```
 
-The agent loop itself lives in [`src/minileanagent/agent.py`](src/minileanagent/agent.py).
-The local and Kimina verifiers live in
-[`src/minileanagent/environment.py`](src/minileanagent/environment.py).
-
-## Local and Kimina verification
-
-The reference backend runs the project-native command:
-
-- `lake env lean FILE.lean` when a Lake project is detected
-- `lean FILE.lean` otherwise
-- a custom command supplied with `--lean-command` when needed
-
-For high-throughput, self-contained Mathlib snippets, install the Kimina extra and point the
-agent at a Kimina Lean Server:
+Inspect it with mini-SWE-agent's trajectory browser:
 
 ```bash
-python -m pip install 'mini-lean-agent[kimina]'
-mini-lean solve \
-  "Prove the theorem in Main.lean." \
-  --project . \
-  --target Main.lean \
-  --checker kimina \
-  --kimina-url http://localhost:8000
+mini-extra inspect <trajectory-file>
 ```
 
-Kimina checks code in the server's configured Lean project. Use the local backend for repositories
-with project-specific imports unless the Kimina server was configured for that project.
+Lean evaluation metadata is added under `info.mini_lean_agent`. No competing trajectory format is
+introduced.
 
-## Batch evaluation
+## Batch baseline
 
-Create `tasks.jsonl`:
+A JSONL row contains a task, isolated project, target, and preferably a protected declaration:
 
 ```json
-{"id":"example-1","task":"Replace the sorry in Main.lean.","project":"/tmp/task-1","target":"Main.lean"}
-{"id":"example-2","task":"Prove theorem foo.","project":"/tmp/task-2","target":"Foo.lean"}
+{"id":"and-comm","task":"Replace the sorry.","project":"examples/core","target":"MiniLeanExample.lean","declaration":"and_comm_example"}
 ```
 
-Run sequentially:
+Run rows sequentially:
 
 ```bash
-mini-lean batch tasks.jsonl \
-  --model "$MINI_LEAN_MODEL" \
-  --toolset bash \
-  --output-dir results/bash
-
-mini-lean batch tasks.jsonl \
-  --model "$MINI_LEAN_MODEL" \
-  --toolset lean \
-  --output-dir results/lean
+mini-lean batch examples/tasks.jsonl \
+  --output-dir results/bash \
+  --model "$MSWEA_MODEL_NAME"
 ```
 
-Each task should have an isolated checkout. This prevents one agent's edits from affecting another
-and makes trajectories replayable.
+The adapter writes one upstream trajectory per row and `summary.jsonl`. Parallel scheduling belongs
+outside the baseline.
 
-## What to report
+## Python API
 
-For a comparable baseline, record:
+```python
+from minileanagent.runner import run_task
 
-- repository commit and Lean toolchain
-- model identifier and provider
-- `bash` or `lean` toolset
-- local or Kimina checker
-- step, cost, wall-time, command-timeout, and output limits
-- success criterion and whether theorem statements were frozen
-- total model cost and number of model calls
+outcome = run_task(
+    "Replace the sorry in Main.lean.",
+    project="/path/to/project",
+    target="Main.lean",
+    declaration="MyProject.main_theorem",
+    model_name="openrouter/<provider>/<model>",
+)
 
-The trajectory schema records these fields wherever the runner can observe them.
+assert outcome.verified
+print(outcome.trajectory_path)
+```
+
+Internally, `run_task` directly constructs upstream `DefaultAgent`, `LocalEnvironment`, and the model
+returned by mini-SWE-agent's `get_model` function.
 
 ## Evaluation boundary
 
-The built-in verifier fixes the submitted path and rejects compiler errors and `sorry` warnings. It
-does not automatically prove that theorem statements, imports, axioms, or other source declarations
-were left unchanged. Benchmark harnesses should inspect the final diff or wrap `--lean-command` with
-a task-specific evaluator that enforces those invariants.
+The built-in evaluator fixes the target path, compiles that file, rejects proof placeholders, and can
+preserve one declaration's elaborated type. It does not prove that imports, unrelated declarations,
+other files, or the project's axiom set were unchanged. Stronger task-specific checks should wrap
+this baseline rather than alter its agent loop.
 
-## Scope
-
-mini-lean-agent is intentionally **not**:
-
-- a tactic-level MDP such as Pantograph
-- a retrieval system over Mathlib
-- a proof-tree or best-first-search controller
-- a multi-agent formalization pipeline
-- a theorem-statement repair system
-
-Those can be layered on top and compared against this baseline.
+Native Lean tools, Kimina, retrieval, tactic-level environments, and proof search are useful future
+ablations. They are intentionally absent from the bash-only baseline.
 
 ## Development
 
 ```bash
-uv sync --all-extras
+uv sync --extra dev
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
@@ -207,14 +194,12 @@ uv run pytest --cov=minileanagent
 uv build
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), and the
-[design documentation](https://tomasortega.github.io/mini-lean-agent/design/).
-
 ## Attribution
 
-This project is an independent Lean-focused implementation inspired by the minimal-agent design of
-mini-SWE-agent. It does not copy or vendor mini-SWE-agent. See
-[NOTICE.md](NOTICE.md) for attribution and related projects.
+mini-lean-agent depends on [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent), released
+under the MIT License by Kilian A. Lieret, Carlos E. Jimenez, and contributors. No mini-SWE-agent
+source is vendored here. See [NOTICE.md](NOTICE.md) and
+[third_party/mini-swe-agent-LICENSE.md](third_party/mini-swe-agent-LICENSE.md).
 
 ## License
 

@@ -1,17 +1,16 @@
 cff-version: 1.2.0
-message: "If you use mini-lean-agent in research, please cite this software."
-title: "mini-lean-agent: A minimal Lean agent baseline"
+title: mini-lean-agent
+message: If you use this software, cite this repository and mini-SWE-agent.
 type: software
 authors:
   - family-names: Ortega
     given-names: Tomas
-repository-code: "https://github.com/TomasOrtega/mini-lean-agent"
-url: "https://tomasortega.github.io/mini-lean-agent/"
+repository-code: https://github.com/TomasOrtega/mini-lean-agent
+url: https://github.com/TomasOrtega/mini-lean-agent
+version: 0.2.0
 license: MIT
-version: 0.1.0
-date-released: 2026-08-26
-keywords:
-  - Lean 4
-  - theorem proving
-  - formalization
-  - language-model agents
+date-released: 2026-08-27
+references:
+  - type: software
+    title: mini-SWE-agent
+    url: https://github.com/SWE-agent/mini-swe-agent

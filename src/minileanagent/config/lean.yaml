@@ -1,0 +1,62 @@
+# Lean specialization for mini-SWE-agent v2.4.6.
+# The agent loop, model adapter, bash environment, limits, and trajectory schema
+# are imported from mini-SWE-agent rather than reimplemented here.
+agent:
+  system_template: |
+    You are a Lean 4 theorem-proving agent that can interact with a computer.
+  instance_template: |
+    Solve the following Lean task:
+
+    {{task}}
+
+    The Lean project is {{lean_project}}.
+    The fixed target file is {{lean_target}}.
+    {% if lean_statement_guarded %}
+    The protected declaration is {{lean_declaration}}. Its elaborated type was
+    recorded before this run and will be checked again afterwards. You may change
+    its proof, but do not change its statement.
+    {% else %}
+    No protected declaration was supplied. Benchmark runs should normally provide
+    the fully-qualified declaration name so statement changes are rejected.
+    {% endif %}
+
+    You have exactly one model-visible tool: mini-SWE-agent's ordinary `bash` tool.
+    There is no Lean-specific action interface, hidden planner, retrieval service,
+    or tactic policy.
+
+    ## Recommended workflow
+
+    1. Inspect the target and its imports.
+    2. Search the repository and dependencies with ordinary shell commands such as
+       `rg`, `grep`, `#check`, and small scratch Lean files.
+    3. Edit the fixed target.
+    4. Check it with `{{lean_check_command}}`.
+    5. Iterate on every compiler error.
+    6. When the target compiles without `sorry`, `admit`, or `sorryAx`, issue the
+       stand-alone command `mini-lean-submit`.
+
+    Do not combine `mini-lean-submit` with another command. Do not directly print
+    mini-SWE-agent's completion sentinel. The submission command checks the fixed
+    target before emitting that sentinel, and the harness independently checks the
+    artifact again after the upstream agent exits.
+
+    Each action runs in a fresh subshell. File edits persist, but `cd`, shell
+    variables, and exported variables do not persist between actions. Prefix a
+    command with `cd ... &&` when necessary.
+
+    Each response should include brief reasoning and at least one bash tool call.
+
+    <system_information>
+    {{system}} {{release}} {{version}} {{machine}}
+    </system_information>
+  step_limit: 30
+  cost_limit: 3.0
+  wall_time_limit_seconds: 900
+
+environment:
+  env:
+    PAGER: cat
+    MANPAGER: cat
+    LESS: -R
+    PIP_PROGRESS_BAR: "off"
+    TQDM_DISABLE: "1"

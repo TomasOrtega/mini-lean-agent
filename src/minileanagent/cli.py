@@ -1,431 +1,261 @@
-"""Command-line interface for mini-lean-agent."""
+"""Command-line interface for the thin Lean specialization."""
 
 from __future__ import annotations
 
 import json
-import re
-from dataclasses import asdict
-from datetime import datetime, timezone
-from enum import Enum
+import shutil
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import typer
-from rich.console import Console
-from rich.json import JSON
-from rich.panel import Panel
-from rich.table import Table
 
 from minileanagent import __version__
-from minileanagent.agent import AgentConfig, MiniLeanAgent, RunResult
-from minileanagent.environment import LocalLeanEnvironment, doctor as run_doctor
-from minileanagent.models import LiteLLMModel
-from minileanagent.types import ToolCall
+from minileanagent.batch import run_batch
+from minileanagent.config import config_path
+from minileanagent.runner import (
+    default_trajectory_path,
+    installed_upstream_version,
+    run_task,
+)
+from minileanagent.verify import (
+    project_lean_command,
+    resolve_project,
+    resolve_target,
+    verify_target,
+)
 
 app = typer.Typer(
     name="mini-lean",
-    help="A minimal, reproducible agent baseline for Lean 4 tasks.",
+    help="Run mini-SWE-agent as a minimal Lean theorem-proving baseline.",
     no_args_is_help=True,
-    add_completion=False,
+    invoke_without_command=True,
 )
-console = Console()
+
+DEFAULT_PROJECT = Path(".")
+DEFAULT_TARGET = Path("Main.lean")
+DEFAULT_BATCH_OUTPUT = Path("mini-lean-results")
 
 
-class Toolset(str, Enum):
-    bash = "bash"
-    lean = "lean"
-
-
-class CheckerBackend(str, Enum):
-    local = "local"
-    kimina = "kimina"
-
-
-def _version_callback(value: bool) -> None:
-    if value:
-        console.print(f"mini-lean-agent {__version__}")
-        raise typer.Exit()
+def _parse_model_config(raw: str | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise typer.BadParameter(f"Invalid JSON: {exc}", param_hint="--model-config") from exc
+    if not isinstance(value, dict):
+        raise typer.BadParameter("Expected a JSON object", param_hint="--model-config")
+    if not all(isinstance(key, str) for key in value):
+        raise typer.BadParameter(
+            "Model configuration keys must be strings",
+            param_hint="--model-config",
+        )
+    return cast(dict[str, Any], value)
 
 
 @app.callback()
-def main(
-    version: Annotated[
+def root(
+    version_flag: Annotated[
         bool,
-        typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version."),
+        typer.Option("--version", help="Show versions and exit", is_eager=True),
     ] = False,
 ) -> None:
-    """Run Lean agents, check proofs, and inspect trajectories."""
-
-
-def _slug(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-.")
-    return cleaned[:80] or "task"
-
-
-def _default_trajectory(project: Path, label: str = "run") -> Path:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    return project / ".mini-lean-agent" / "trajectories" / f"{timestamp}-{_slug(label)}.json"
-
-
-def _build_agent(
-    *,
-    project: Path,
-    target: Path | None,
-    model_name: str,
-    toolset: Toolset,
-    backend: CheckerBackend,
-    lean_command: str | None,
-    kimina_url: str | None,
-    kimina_api_key: str | None,
-    api_base: str | None,
-    api_key: str | None,
-    temperature: float,
-    max_tokens: int | None,
-    step_limit: int,
-    cost_limit: float,
-    wall_time_limit: int,
-    command_timeout: int,
-    max_output_chars: int,
-    trajectory: Path,
-) -> MiniLeanAgent:
-    environment = LocalLeanEnvironment(
-        project,
-        target=target,
-        toolset=toolset.value,
-        checker_backend=backend.value,
-        lean_command=lean_command,
-        command_timeout_seconds=command_timeout,
-        max_output_chars=max_output_chars,
-        kimina_url=kimina_url,
-        kimina_api_key=kimina_api_key,
-    )
-    model = LiteLLMModel(
-        model_name=model_name,
-        api_base=api_base,
-        api_key=api_key,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    config = AgentConfig(
-        step_limit=step_limit,
-        cost_limit=cost_limit,
-        wall_time_limit_seconds=wall_time_limit,
-        trajectory_path=trajectory,
-    )
-    return MiniLeanAgent(model=model, environment=environment, config=config)
-
-
-def _print_result(result: RunResult) -> None:
-    table = Table(title="mini-lean result", show_header=False)
-    table.add_column("field", style="bold")
-    table.add_column("value")
-    table.add_row("status", result.status)
-    table.add_row("steps", str(result.steps))
-    table.add_row("cost", f"${result.cost:.4f}")
-    table.add_row("elapsed", f"{result.elapsed_seconds:.1f}s")
-    table.add_row("trajectory", str(result.trajectory_path or "not saved"))
-    if result.submission:
-        table.add_row("submission", result.submission)
-    console.print(table)
+    if version_flag:
+        typer.echo(f"mini-lean-agent {__version__}")
+        typer.echo(f"mini-swe-agent {installed_upstream_version()}")
+        raise typer.Exit()
 
 
 @app.command()
 def solve(
-    task: Annotated[str, typer.Argument(help="Natural-language Lean task to solve.")],
-    project: Annotated[
-        Path, typer.Option("--project", "-p", help="Lean project root.", file_okay=False)
-    ] = Path("."),
-    target: Annotated[
-        Path | None,
-        typer.Option("--target", "-t", help="Project-relative Lean file to submit."),
-    ] = None,
-    model: Annotated[
+    task: Annotated[str, typer.Argument(help="Lean task or theorem-proving instruction")],
+    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
+    target: Annotated[Path, typer.Option("--target", "-t")] = DEFAULT_TARGET,
+    declaration: Annotated[
         str | None,
         typer.Option(
-            "--model",
-            "-m",
-            envvar="MINI_LEAN_MODEL",
-            help="LiteLLM model name, for example an OpenRouter model.",
+            "--declaration",
+            "-d",
+            help="Fully-qualified declaration whose type must remain unchanged",
         ),
     ] = None,
-    toolset: Annotated[
-        Toolset,
-        typer.Option("--toolset", help="`bash` for the strict baseline or `lean` for lean_check."),
-    ] = Toolset.bash,
-    backend: Annotated[
-        CheckerBackend,
-        typer.Option("--checker", help="Lean checking backend."),
-    ] = CheckerBackend.local,
+    model: Annotated[str | None, typer.Option("--model", "-m")] = None,
+    trajectory: Annotated[Path | None, typer.Option("--trajectory", "-o")] = None,
+    config: Annotated[Path | None, typer.Option("--config", "-c")] = None,
     lean_command: Annotated[
         str | None,
-        typer.Option(
-            "--lean-command",
-            help="Override checker command, for example 'lake env lean'.",
-        ),
+        typer.Option("--lean-command", help="Checker command, with optional {target}"),
     ] = None,
-    kimina_url: Annotated[
+    model_class: Annotated[str | None, typer.Option("--model-class")] = None,
+    model_config: Annotated[
         str | None,
-        typer.Option("--kimina-url", envvar="KIMINA_URL", help="Kimina server URL."),
+        typer.Option("--model-config", help="JSON object merged into model config"),
     ] = None,
-    kimina_api_key: Annotated[
-        str | None,
-        typer.Option(
-            "--kimina-api-key",
-            envvar="KIMINA_API_KEY",
-            help="Kimina API key. Prefer the environment variable.",
-        ),
-    ] = None,
-    api_base: Annotated[
-        str | None,
-        typer.Option("--api-base", envvar="MINI_LEAN_API_BASE", help="Custom LLM API base."),
-    ] = None,
-    api_key: Annotated[
-        str | None,
-        typer.Option(
-            "--api-key",
-            envvar="MINI_LEAN_API_KEY",
-            help="LLM API key. Provider-specific environment variables also work.",
-        ),
-    ] = None,
-    temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
-    max_tokens: Annotated[int | None, typer.Option("--max-tokens")] = None,
     step_limit: Annotated[int, typer.Option("--step-limit")] = 30,
-    cost_limit: Annotated[
-        float, typer.Option("--cost-limit", help="Approximate USD limit. Set 0 to disable.")
-    ] = 5.0,
-    wall_time_limit: Annotated[
-        int, typer.Option("--wall-time-limit", help="Wall-time limit in seconds. Set 0 to disable.")
-    ] = 900,
-    command_timeout: Annotated[
-        int, typer.Option("--command-timeout", help="Timeout for each shell/check call.")
-    ] = 120,
-    max_output_chars: Annotated[int, typer.Option("--max-output-chars")] = 20_000,
-    trajectory: Annotated[
-        Path | None,
-        typer.Option("--trajectory", "-o", help="Where to save the JSON trajectory."),
-    ] = None,
+    cost_limit: Annotated[float, typer.Option("--cost-limit")] = 3.0,
+    wall_time_limit: Annotated[int, typer.Option("--wall-time-limit")] = 900,
+    command_timeout: Annotated[int, typer.Option("--command-timeout")] = 120,
+    verification_timeout: Annotated[int, typer.Option("--verification-timeout")] = 120,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Run one agent on one Lean project."""
-    if not model:
-        console.print(
-            "[red]No model configured.[/red] Pass --model or set MINI_LEAN_MODEL."
+    """Run upstream mini-SWE-agent on one fixed Lean target."""
+    try:
+        project_path, _, _ = resolve_target(project, target)
+        outcome = run_task(
+            task,
+            project=project_path,
+            target=target,
+            declaration=declaration,
+            model_name=model,
+            trajectory_path=trajectory or default_trajectory_path(project_path),
+            step_limit=step_limit,
+            cost_limit=cost_limit,
+            wall_time_limit_seconds=wall_time_limit,
+            command_timeout_seconds=command_timeout,
+            verification_timeout_seconds=verification_timeout,
+            lean_command=lean_command,
+            model_class=model_class,
+            model_config=_parse_model_config(model_config),
+            lean_config_path=config,
         )
-        raise typer.Exit(2)
+    except (ModuleNotFoundError, OSError, RuntimeError, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
-    root = project.expanduser().resolve()
-    output = trajectory.expanduser().resolve() if trajectory else _default_trajectory(root, task)
-    console.print(
-        Panel.fit(
-            "The model can execute arbitrary shell commands in the selected project. "
-            "Use a disposable checkout or sandbox for untrusted models.",
-            title="Security warning",
-            border_style="yellow",
-        )
-    )
-    agent = _build_agent(
-        project=root,
-        target=target,
-        model_name=model,
-        toolset=toolset,
-        backend=backend,
-        lean_command=lean_command,
-        kimina_url=kimina_url,
-        kimina_api_key=kimina_api_key,
-        api_base=api_base,
-        api_key=api_key,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        step_limit=step_limit,
-        cost_limit=cost_limit,
-        wall_time_limit=wall_time_limit,
-        command_timeout=command_timeout,
-        max_output_chars=max_output_chars,
-        trajectory=output,
-    )
-    result = agent.run(task)
-    _print_result(result)
-    raise typer.Exit(0 if result.status == "success" else 1)
+    if json_output:
+        typer.echo(json.dumps(outcome.to_dict(), indent=2, sort_keys=True))
+    else:
+        typer.echo(f"status: {outcome.status}")
+        typer.echo(f"verified: {str(outcome.verified).lower()}")
+        typer.echo(f"upstream_exit_status: {outcome.upstream_exit_status}")
+        typer.echo(f"trajectory: {outcome.trajectory_path}")
+        typer.echo(f"verification: {outcome.verification.reason}")
+
+    if not outcome.verified:
+        raise typer.Exit(1)
 
 
 @app.command("check")
-def check_file(
-    path: Annotated[Path, typer.Argument(help="Project-relative Lean file to check.")],
-    project: Annotated[
-        Path, typer.Option("--project", "-p", help="Lean project root.", file_okay=False)
-    ] = Path("."),
-    backend: Annotated[CheckerBackend, typer.Option("--checker")] = CheckerBackend.local,
-    lean_command: Annotated[str | None, typer.Option("--lean-command")] = None,
-    kimina_url: Annotated[str | None, typer.Option("--kimina-url", envvar="KIMINA_URL")] = None,
-    kimina_api_key: Annotated[
-        str | None, typer.Option("--kimina-api-key", envvar="KIMINA_API_KEY")
+def check_command(
+    target: Annotated[Path, typer.Argument(help="Lean file to verify")],
+    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
+    declaration: Annotated[
+        str | None,
+        typer.Option("--declaration", "-d", help="Declaration whose type to report"),
+    ] = None,
+    lean_command: Annotated[
+        str | None,
+        typer.Option("--lean-command", help="Checker command, with optional {target}"),
     ] = None,
     timeout: Annotated[int, typer.Option("--timeout")] = 120,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Check a file with the same verifier used for submission."""
-    environment = LocalLeanEnvironment(
-        project,
-        target=path,
-        toolset="lean",
-        checker_backend=backend.value,
-        lean_command=lean_command,
-        command_timeout_seconds=timeout,
-        kimina_url=kimina_url,
-        kimina_api_key=kimina_api_key,
-    )
-    observation = environment.execute(
-        ToolCall(id="cli-check", name="lean_check", arguments={"path": str(path)})
-    )
-    console.print(JSON.from_data(observation))
-    raise typer.Exit(0 if observation.get("ok") else 1)
+    """Compile one target and reject ``sorry``, ``admit``, and ``sorryAx``."""
+    try:
+        result = verify_target(
+            project,
+            target,
+            declaration=declaration,
+            command_template=lean_command,
+            timeout_seconds=timeout,
+        )
+    except (OSError, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    if json_output:
+        typer.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        typer.echo(f"{result.reason}: {result.target}")
+        if result.actual_type:
+            typer.echo(f"declaration_type: {result.actual_type}")
+        if result.output:
+            typer.echo(result.output.rstrip())
+    if not result.ok:
+        raise typer.Exit(1)
 
 
 @app.command()
 def doctor(
-    project: Annotated[
-        Path, typer.Option("--project", "-p", help="Lean project root.", file_okay=False)
-    ] = Path("."),
+    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
+    target: Annotated[Path | None, typer.Option("--target", "-t")] = None,
     lean_command: Annotated[str | None, typer.Option("--lean-command")] = None,
 ) -> None:
-    """Check whether the local project can run mini-lean-agent."""
-    result = run_doctor(project, lean_command)
-    console.print(JSON.from_data(result))
-    raise typer.Exit(0 if result.get("ready") else 1)
+    """Show package versions and the resolved Lean checker."""
+    try:
+        project_path = resolve_project(project)
+        typer.echo(f"mini-lean-agent: {__version__}")
+        typer.echo(f"mini-swe-agent: {installed_upstream_version()}")
+        typer.echo(f"project: {project_path}")
+        typer.echo(f"mini-lean-submit: {shutil.which('mini-lean-submit') or 'not found'}")
+        if target is not None:
+            _, relative, _ = resolve_target(project_path, target)
+            command = project_lean_command(project_path, relative, lean_command)
+            typer.echo(f"target: {relative}")
+            typer.echo(f"command: {' '.join(command)}")
+            executable = shutil.which(command[0])
+            if executable is None:
+                raise ValueError(f"Executable is not on PATH: {command[0]}")
+            typer.echo(f"executable: {executable}")
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
 
-@app.command("inspect")
-def inspect_trajectory(
-    trajectory: Annotated[Path, typer.Argument(help="Trajectory JSON file.")],
-    full: Annotated[
-        bool, typer.Option("--full", help="Print the complete linear history.")
-    ] = False,
-) -> None:
-    """Inspect a saved trajectory without a separate UI."""
-    data = json.loads(trajectory.read_text(encoding="utf-8"))
-    run = data.get("run") or {}
-    environment = data.get("environment") or {}
-    table = Table(title=str(trajectory))
-    table.add_column("field", style="bold")
-    table.add_column("value")
-    for key in ("status", "model", "steps", "cost", "submission", "started_at", "finished_at"):
-        table.add_row(key, str(run.get(key, "")))
-    table.add_row("project", str(environment.get("project", "")))
-    table.add_row("toolset", str(environment.get("toolset", "")))
-    console.print(table)
-
-    if full:
-        for index, message in enumerate(data.get("messages") or []):
-            role = message.get("role", "unknown")
-            content = message.get("content", "")
-            if role == "assistant" and message.get("tool_calls"):
-                content = f"{content}\n\n{json.dumps(message['tool_calls'], indent=2)}"
-            console.print(Panel(str(content), title=f"{index}: {role}"))
+@app.command("config-path")
+def show_config_path() -> None:
+    """Print the packaged Lean overlay path."""
+    typer.echo(config_path())
 
 
 @app.command()
 def batch(
-    tasks: Annotated[
-        Path,
-        typer.Argument(
-            help="JSONL file with id, task, project, and optional target fields. Runs sequentially."
-        ),
-    ],
-    model: Annotated[
-        str | None,
-        typer.Option("--model", "-m", envvar="MINI_LEAN_MODEL"),
-    ] = None,
-    output_dir: Annotated[
-        Path, typer.Option("--output-dir", "-o", help="Trajectory and result directory.")
-    ] = Path("mini-lean-results"),
-    toolset: Annotated[Toolset, typer.Option("--toolset")] = Toolset.bash,
-    backend: Annotated[CheckerBackend, typer.Option("--checker")] = CheckerBackend.local,
+    tasks: Annotated[Path, typer.Argument(help="JSONL task file")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o")] = DEFAULT_BATCH_OUTPUT,
+    model: Annotated[str | None, typer.Option("--model", "-m")] = None,
+    config: Annotated[Path | None, typer.Option("--config", "-c")] = None,
     lean_command: Annotated[str | None, typer.Option("--lean-command")] = None,
-    kimina_url: Annotated[str | None, typer.Option("--kimina-url", envvar="KIMINA_URL")] = None,
-    kimina_api_key: Annotated[
-        str | None, typer.Option("--kimina-api-key", envvar="KIMINA_API_KEY")
-    ] = None,
-    api_base: Annotated[
-        str | None, typer.Option("--api-base", envvar="MINI_LEAN_API_BASE")
-    ] = None,
-    api_key: Annotated[
-        str | None, typer.Option("--api-key", envvar="MINI_LEAN_API_KEY")
-    ] = None,
-    temperature: Annotated[float, typer.Option("--temperature")] = 0.0,
-    max_tokens: Annotated[int | None, typer.Option("--max-tokens")] = None,
+    model_class: Annotated[str | None, typer.Option("--model-class")] = None,
+    model_config: Annotated[str | None, typer.Option("--model-config")] = None,
     step_limit: Annotated[int, typer.Option("--step-limit")] = 30,
-    cost_limit: Annotated[float, typer.Option("--cost-limit")] = 5.0,
+    cost_limit: Annotated[float, typer.Option("--cost-limit")] = 3.0,
     wall_time_limit: Annotated[int, typer.Option("--wall-time-limit")] = 900,
     command_timeout: Annotated[int, typer.Option("--command-timeout")] = 120,
-    max_output_chars: Annotated[int, typer.Option("--max-output-chars")] = 20_000,
+    verification_timeout: Annotated[int, typer.Option("--verification-timeout")] = 120,
 ) -> None:
-    """Run a reproducible JSONL benchmark batch."""
-    if not model:
-        console.print("[red]No model configured.[/red]")
-        raise typer.Exit(2)
+    """Run isolated JSONL tasks sequentially and write upstream trajectories."""
+    try:
+        summaries = run_batch(
+            tasks,
+            output_dir=output_dir,
+            model_name=model,
+            step_limit=step_limit,
+            cost_limit=cost_limit,
+            wall_time_limit_seconds=wall_time_limit,
+            command_timeout_seconds=command_timeout,
+            verification_timeout_seconds=verification_timeout,
+            lean_command=lean_command,
+            model_class=model_class,
+            model_config=_parse_model_config(model_config),
+            lean_config_path=config,
+        )
+    except (ModuleNotFoundError, OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
-    output_dir = output_dir.expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    result_path = output_dir / "results.jsonl"
-    result_path.unlink(missing_ok=True)
-    rows: list[dict[str, Any]] = []
-    for line_number, line in enumerate(tasks.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise typer.BadParameter(f"Invalid JSON on line {line_number}: {exc}") from exc
-        task_id = str(item.get("id") or f"line-{line_number}")
-        task_text = item.get("task")
-        project_value = item.get("project")
-        if not isinstance(task_text, str) or not isinstance(project_value, str):
-            raise typer.BadParameter(f"Line {line_number} requires string `task` and `project`")
-        project_path = Path(project_value).expanduser().resolve()
-        target_value = item.get("target")
-        trajectory = output_dir / "trajectories" / f"{_slug(task_id)}.json"
-        console.rule(f"{task_id}")
-        try:
-            agent = _build_agent(
-                project=project_path,
-                target=Path(target_value) if isinstance(target_value, str) else None,
-                model_name=model,
-                toolset=toolset,
-                backend=backend,
-                lean_command=lean_command,
-                kimina_url=kimina_url,
-                kimina_api_key=kimina_api_key,
-                api_base=api_base,
-                api_key=api_key,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                step_limit=step_limit,
-                cost_limit=cost_limit,
-                wall_time_limit=wall_time_limit,
-                command_timeout=command_timeout,
-                max_output_chars=max_output_chars,
-                trajectory=trajectory,
-            )
-            result = agent.run(task_text)
-            row = {"id": task_id, **asdict(result)}
-            row["trajectory_path"] = str(result.trajectory_path) if result.trajectory_path else None
-        except Exception as exc:
-            row = {
-                "id": task_id,
-                "status": "error",
-                "error_type": type(exc).__name__,
-                "error": str(exc),
-                "trajectory_path": str(trajectory),
-            }
-        rows.append(row)
-        with result_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
-        console.print(row)
+    failures = sum(not bool(summary.get("verified")) for summary in summaries)
+    typer.echo(f"completed: {len(summaries)}")
+    typer.echo(f"failures: {failures}")
+    typer.echo(f"summary: {output_dir.expanduser().resolve() / 'summary.jsonl'}")
+    if failures:
+        raise typer.Exit(1)
 
-    if not rows:
-        raise typer.BadParameter("The task file contains no runnable JSONL rows")
 
-    successes = sum(row.get("status") == "success" for row in rows)
-    console.print(f"Completed {len(rows)} tasks: {successes} successes. Results: {result_path}")
-    raise typer.Exit(0 if successes == len(rows) else 1)
+@app.command("version")
+def version_command() -> None:
+    """Print mini-lean-agent and upstream mini-SWE-agent versions."""
+    typer.echo(f"mini-lean-agent {__version__}")
+    typer.echo(f"mini-swe-agent {installed_upstream_version()}")
 
 
 if __name__ == "__main__":

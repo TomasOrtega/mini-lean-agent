@@ -2,33 +2,156 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+from minileanagent import cli
 from minileanagent.cli import app
 
 runner = CliRunner()
 
 
-def test_version() -> None:
-    result = runner.invoke(app, ["--version"])
+def test_version_reports_both_projects(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "installed_upstream_version", lambda: "2.4.6")
+    result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert "mini-lean-agent" in result.stdout
+    assert "mini-swe-agent 2.4.6" in result.stdout
 
 
-def test_doctor_with_configured_command(lean_project: tuple[Path, str]) -> None:
-    project, command = lean_project
+def test_check_command(fake_lean_project: tuple[Path, str]) -> None:
+    project, command = fake_lean_project
     result = runner.invoke(
         app,
-        ["doctor", "--project", str(project), "--lean-command", command],
+        ["check", "Main.lean", "--project", str(project), "--lean-command", command],
     )
     assert result.exit_code == 0
-    assert '"ready": true' in result.stdout
+    assert "accepted" in result.stdout
+
+    (project / "Main.lean").write_text(
+        "theorem Demo.bad : True := by sorry\n",
+        encoding="utf-8",
+    )
+    rejected = runner.invoke(
+        app,
+        ["check", "Main.lean", "--project", str(project), "--lean-command", command],
+    )
+    assert rejected.exit_code == 1
+    assert "placeholder" in rejected.stdout
 
 
-def test_check_command(lean_project: tuple[Path, str]) -> None:
-    project, command = lean_project
-    (project / "Main.lean").write_text("theorem ok : True := by trivial\n", encoding="utf-8")
+def test_solve_delegates_to_runner(
+    fake_lean_project: tuple[Path, str], tmp_path: Path, monkeypatch
+) -> None:
+    project, command = fake_lean_project
+    seen: dict[str, object] = {}
+
+    class FakeOutcome:
+        status = "success"
+        verified = True
+        upstream_exit_status = "Submitted"
+        trajectory_path = tmp_path / "run.traj.json"
+        verification = SimpleNamespace(reason="accepted")
+
+        def to_dict(self):
+            return {"status": self.status, "verified": self.verified}
+
+    def fake_run_task(task: str, **kwargs):
+        seen["task"] = task
+        seen.update(kwargs)
+        return FakeOutcome()
+
+    monkeypatch.setattr(cli, "run_task", fake_run_task)
+    result = runner.invoke(
+        app,
+        [
+            "solve",
+            "replace the sorry",
+            "--project",
+            str(project),
+            "--target",
+            "Main.lean",
+            "--declaration",
+            "Demo.complete",
+            "--model",
+            "provider/model",
+            "--lean-command",
+            command,
+            "--model-config",
+            '{"model_kwargs": {"temperature": 0}}',
+        ],
+    )
+    assert result.exit_code == 0
+    assert seen["task"] == "replace the sorry"
+    assert seen["declaration"] == "Demo.complete"
+    assert seen["model_name"] == "provider/model"
+    assert seen["model_config"] == {"model_kwargs": {"temperature": 0}}
+    assert "verified: true" in result.stdout
+
+
+def test_solve_returns_failure_for_unverified_result(
+    fake_lean_project: tuple[Path, str], monkeypatch
+) -> None:
+    project, _ = fake_lean_project
+    outcome = SimpleNamespace(
+        status="verification_failed",
+        verified=False,
+        upstream_exit_status="Submitted",
+        trajectory_path=project / "run.json",
+        verification=SimpleNamespace(reason="contains sorry"),
+        to_dict=lambda: {"verified": False},
+    )
+    monkeypatch.setattr(cli, "run_task", lambda *args, **kwargs: outcome)
+    result = runner.invoke(
+        app,
+        ["solve", "prove", "--project", str(project), "--target", "Main.lean"],
+    )
+    assert result.exit_code == 1
+    assert "verified: false" in result.stdout
+
+
+def test_model_config_must_be_object(fake_lean_project: tuple[Path, str]) -> None:
+    project, _ = fake_lean_project
+    result = runner.invoke(
+        app,
+        [
+            "solve",
+            "prove",
+            "--project",
+            str(project),
+            "--target",
+            "Main.lean",
+            "--model-config",
+            "[]",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Expected a JSON object" in result.output
+
+
+def test_doctor_resolves_command(fake_lean_project: tuple[Path, str], monkeypatch) -> None:
+    project, command = fake_lean_project
+    monkeypatch.setattr(cli, "installed_upstream_version", lambda: "2.4.6")
+    result = runner.invoke(
+        app,
+        [
+            "doctor",
+            "--project",
+            str(project),
+            "--target",
+            "Main.lean",
+            "--lean-command",
+            command,
+        ],
+    )
+    assert result.exit_code == 0
+    assert "mini-swe-agent: 2.4.6" in result.stdout
+    assert "command:" in result.stdout
+
+
+def test_check_json_output(fake_lean_project: tuple[Path, str]) -> None:
+    project, command = fake_lean_project
     result = runner.invoke(
         app,
         [
@@ -38,156 +161,51 @@ def test_check_command(lean_project: tuple[Path, str]) -> None:
             str(project),
             "--lean-command",
             command,
+            "--json",
         ],
     )
     assert result.exit_code == 0
-    assert '"success": true' in result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
 
 
-def test_inspect_command(tmp_path: Path) -> None:
-    trajectory = tmp_path / "run.json"
-    trajectory.write_text(
-        json.dumps(
-            {
-                "run": {"status": "success", "model": "x", "steps": 1, "cost": 0},
-                "environment": {"project": "/tmp/p", "toolset": "lean"},
-                "messages": [{"role": "assistant", "content": "done"}],
-            }
-        ),
-        encoding="utf-8",
-    )
-    result = runner.invoke(app, ["inspect", str(trajectory), "--full"])
+def test_root_version_flag(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "installed_upstream_version", lambda: "2.4.6")
+    result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "success" in result.stdout
-    assert "done" in result.stdout
+    assert "mini-lean-agent" in result.stdout
+    assert "2.4.6" in result.stdout
 
 
-def test_solve_requires_model(lean_project: tuple[Path, str]) -> None:
-    project, _ = lean_project
-    result = runner.invoke(app, ["solve", "task", "--project", str(project)])
-    assert result.exit_code == 2
-    assert "No model configured" in result.stdout
+def test_config_path_command() -> None:
+    result = runner.invoke(app, ["config-path"])
+    assert result.exit_code == 0
+    assert result.stdout.strip().endswith("lean.yaml")
 
 
-def test_build_agent_and_solve_success(
-    lean_project: tuple[Path, str], tmp_path: Path, monkeypatch
-) -> None:
-    from minileanagent import cli
-    from minileanagent.agent import RunResult
-
-    project, command = lean_project
-    built = cli._build_agent(
-        project=project,
-        target=Path("Main.lean"),
-        model_name="provider/model",
-        toolset=cli.Toolset.bash,
-        backend=cli.CheckerBackend.local,
-        lean_command=command,
-        kimina_url=None,
-        kimina_api_key=None,
-        api_base=None,
-        api_key=None,
-        temperature=0.0,
-        max_tokens=None,
-        step_limit=2,
-        cost_limit=1.0,
-        wall_time_limit=10,
-        command_timeout=5,
-        max_output_chars=1000,
-        trajectory=tmp_path / "built.json",
-    )
-    assert built.environment.toolset == "bash"
-    assert built.model.name == "provider/model"
-
-    class FakeAgent:
-        def run(self, task: str) -> RunResult:
-            assert task == "prove it"
-            return RunResult(
-                status="success",
-                submission="done",
-                steps=2,
-                cost=0.1,
-                elapsed_seconds=1.0,
-                trajectory_path=tmp_path / "run.json",
-            )
-
-    monkeypatch.setattr(cli, "_build_agent", lambda **kwargs: FakeAgent())
+def test_model_config_invalid_json(fake_lean_project: tuple[Path, str]) -> None:
+    project, _ = fake_lean_project
     result = runner.invoke(
         app,
         [
             "solve",
-            "prove it",
+            "prove",
             "--project",
             str(project),
-            "--target",
-            "Main.lean",
-            "--model",
-            "provider/model",
+            "--model-config",
+            "{",
         ],
     )
-    assert result.exit_code == 0
-    assert "Security warning" in result.stdout
-    assert "success" in result.stdout
-    assert "done" in result.stdout
-
-
-def test_batch_success_and_error(tmp_path: Path, monkeypatch) -> None:
-    from minileanagent import cli
-    from minileanagent.agent import RunResult
-
-    project = tmp_path / "p"
-    project.mkdir()
-    tasks = tmp_path / "tasks.jsonl"
-    tasks.write_text(
-        "\n".join(
-            [
-                json.dumps({"id": "ok", "task": "one", "project": str(project)}),
-                json.dumps({"id": "bad", "task": "two", "project": str(project)}),
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    class FakeAgent:
-        def __init__(self, fail: bool) -> None:
-            self.fail = fail
-
-        def run(self, task: str) -> RunResult:
-            if self.fail:
-                raise RuntimeError("synthetic")
-            return RunResult("success", "ok", 1, 0.0, 0.1, None)
-
-    calls = iter([FakeAgent(False), FakeAgent(True)])
-    monkeypatch.setattr(cli, "_build_agent", lambda **kwargs: next(calls))
-    output = tmp_path / "out"
-    result = runner.invoke(
-        app,
-        [
-            "batch",
-            str(tasks),
-            "--model",
-            "provider/model",
-            "--output-dir",
-            str(output),
-        ],
-    )
-    assert result.exit_code == 1
-    rows = [json.loads(line) for line in (output / "results.jsonl").read_text().splitlines()]
-    assert rows[0]["status"] == "success"
-    assert rows[1]["status"] == "error"
-
-
-def test_batch_rejects_invalid_json(tmp_path: Path) -> None:
-    tasks = tmp_path / "tasks.jsonl"
-    tasks.write_text("not json\n", encoding="utf-8")
-    result = runner.invoke(app, ["batch", str(tasks), "--model", "provider/model"])
-    assert result.exit_code != 0
+    assert result.exit_code == 2
     assert "Invalid JSON" in result.output
 
 
-def test_batch_rejects_empty_file(tmp_path: Path) -> None:
-    tasks = tmp_path / "tasks.jsonl"
-    tasks.write_text("\n", encoding="utf-8")
-    result = runner.invoke(app, ["batch", str(tasks), "--model", "provider/model"])
-    assert result.exit_code != 0
-    assert "no runnable" in result.output
+def test_check_invalid_target_is_usage_error(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    result = runner.invoke(
+        app,
+        ["check", "Missing.lean", "--project", str(project)],
+    )
+    assert result.exit_code == 2
+    assert "does not exist" in result.output

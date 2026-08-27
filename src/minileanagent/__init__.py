@@ -1,15 +1,5 @@
-"""mini-lean-agent: a small baseline agent for Lean tasks."""
+"""A thin Lean specialization of mini-SWE-agent."""
 
-from minileanagent.agent import AgentConfig, MiniLeanAgent, RunResult
-from minileanagent.environment import LocalLeanEnvironment
-from minileanagent.models import LiteLLMModel
+__version__ = "0.2.0"
 
-__all__ = [
-    "AgentConfig",
-    "LiteLLMModel",
-    "LocalLeanEnvironment",
-    "MiniLeanAgent",
-    "RunResult",
-]
-
-__version__ = "0.1.0"
+__all__ = ["__version__"]

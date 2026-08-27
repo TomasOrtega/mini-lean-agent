@@ -31,9 +31,18 @@ def fake_upstream_mini_config(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_packaged_config_is_upstream_style() -> None:
     config = load_config()
+    system_template = config["agent"]["system_template"]
+    instance_template = config["agent"]["instance_template"]
     assert set(config) == {"agent", "environment", "model"}
-    assert "mini-lean-submit" in config["agent"]["instance_template"]
-    assert "lean-specific action interface" in config["agent"]["instance_template"].lower()
+    assert "helpful Lean 4 theorem-proving assistant" in system_template
+    assert "Recommended workflow" in instance_template
+    assert "after each proof attempt" in instance_template
+    assert "Read every error or warning" in instance_template
+    assert "Do not change or weaken" in instance_template
+    assert "new axioms" in instance_template
+    assert "Use non-interactive commands" in instance_template
+    assert "mini-lean-submit" in instance_template
+    assert "lean-specific action interface" in instance_template.lower()
     assert "observation_template" in config["model"]
     assert config_path().name == "lean.yaml"
     assert config_path().is_file()

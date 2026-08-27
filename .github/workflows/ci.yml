@@ -18,6 +18,17 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --extra dev
+      - name: Verify upstream contract
+        run: |
+          uv run python - <<'PY'
+          import minisweagent
+          from minisweagent.agents.default import DefaultAgent
+          from minisweagent.environments.local import LocalEnvironment
+          from minisweagent.models.litellm_model import LitellmModel
+
+          print("mini-swe-agent", minisweagent.__version__)
+          print(DefaultAgent, LocalEnvironment, LitellmModel)
+          PY
       - name: Lint
         run: uv run ruff check .
       - name: Format
@@ -29,7 +40,10 @@ jobs:
       - name: Check distributions
         run: uv run twine check dist/*
       - name: Smoke-test CLI
-        run: uv run mini-lean --help
+        run: |
+          uv run mini-lean --help
+          uv run mini-lean version
+          uv run mini-lean-submit --help
 
   tests:
     runs-on: ubuntu-latest
@@ -48,7 +62,6 @@ jobs:
       - name: Test
         run: uv run pytest --cov=minileanagent --cov-report=term-missing --cov-report=xml
 
-
   lean-smoke:
     runs-on: ubuntu-latest
     steps:
@@ -66,6 +79,36 @@ jobs:
         run: uv sync --extra dev
       - name: Accept a complete Lean file
         run: uv run mini-lean check Smoke.lean --project examples/smoke
+      - name: Exercise the declaration-type guard
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+
+          from minileanagent.verify import capture_declaration_type, verify_target
+
+          project = Path("examples/smoke")
+          expected = capture_declaration_type(project, "Smoke.lean", "smoke")
+          accepted = verify_target(
+              project,
+              "Smoke.lean",
+              declaration="smoke",
+              expected_type=expected,
+          )
+          assert accepted.ok and accepted.statement_preserved is True, accepted
+
+          changed = project / "Changed.lean"
+          changed.write_text("theorem smoke : True := by trivial\n", encoding="utf-8")
+          try:
+              rejected = verify_target(
+                  project,
+                  changed.name,
+                  declaration="smoke",
+                  expected_type=expected,
+              )
+              assert not rejected.ok and rejected.statement_preserved is False, rejected
+          finally:
+              changed.unlink(missing_ok=True)
+          PY
       - name: Reject a file containing sorry
         run: |
           if uv run mini-lean check WithSorry.lean --project examples/smoke; then

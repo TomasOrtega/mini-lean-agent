@@ -1,17 +1,18 @@
 # Core Lean example
 
-This tiny project uses only Lean core and contains one intentional `sorry`.
+This tiny project contains one intentional `sorry`.
 
 ```bash
-mini-lean doctor --project examples/core
+export MSWEA_MODEL_NAME='openrouter/<provider>/<model>'
+mini-lean doctor --project examples/core --target MiniLeanExample.lean
 mini-lean solve \
   "$(cat examples/core/task.txt)" \
   --project examples/core \
   --target MiniLeanExample.lean \
-  --model "$MINI_LEAN_MODEL"
+  --declaration and_comm_example
 ```
 
-Restore the example after a run with Git:
+Restore the example after a run:
 
 ```bash
 git checkout -- examples/core/MiniLeanExample.lean

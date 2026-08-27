@@ -174,7 +174,7 @@ def test_statement_fingerprint_rejects_type_change(fake_lean_project: tuple[Path
 
 
 def test_expected_type_environment_round_trip() -> None:
-    original = "Demo.complete : ∀ (α : Type), α → α"
+    original = "Demo.complete : ∀ (A : Type), A → A"
     assert decode_expected_type(encode_expected_type(original)) == original
     assert decode_expected_type("") is None
 
@@ -216,7 +216,7 @@ def test_target_must_be_lean_file(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     (project / "notes.txt").write_text("hello\n", encoding="utf-8")
-    with pytest.raises(ValueError, match=".lean"):
+    with pytest.raises(ValueError, match=r"\.lean"):
         resolve_target(project, "notes.txt")
 
 

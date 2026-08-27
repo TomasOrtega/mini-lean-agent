@@ -56,7 +56,7 @@ def fake_lean_project(tmp_path: Path) -> tuple[Path, str]:
     project.mkdir()
     checker = tmp_path / "fake_lean.py"
     checker.write_text(
-        r'''
+        r"""
 from pathlib import Path
 import re
 import sys
@@ -82,7 +82,7 @@ if begin and end and declaration:
     print(end.group(0))
 else:
     print(f"checked {path}")
-'''.strip()
+""".strip()
         + "\n",
         encoding="utf-8",
     )

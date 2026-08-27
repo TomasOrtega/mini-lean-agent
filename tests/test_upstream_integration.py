@@ -66,9 +66,7 @@ def test_upstream_agent_loop_environment_and_trajectory_are_used(
         [
             {
                 "command": (
-                    "cat > Main.lean <<'EOF'\n"
-                    "theorem Demo.complete : True := by trivial\n"
-                    "EOF"
+                    "cat > Main.lean <<'EOF'\ntheorem Demo.complete : True := by trivial\nEOF"
                 )
             },
             {"command": submit},
@@ -76,9 +74,7 @@ def test_upstream_agent_loop_environment_and_trajectory_are_used(
     )
     source_root = Path(__file__).resolve().parents[1] / "src"
     pythonpath = os.pathsep.join(
-        value
-        for value in (str(source_root), os.environ.get("PYTHONPATH", ""))
-        if value
+        value for value in (str(source_root), os.environ.get("PYTHONPATH", "")) if value
     )
     environment = LocalEnvironment(
         cwd=str(project),

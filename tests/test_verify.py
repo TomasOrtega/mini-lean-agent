@@ -18,12 +18,12 @@ from minileanagent.verify import (
 
 
 def test_comment_and_string_stripping_handles_nested_comments() -> None:
-    source = '''
+    source = """
 -- sorry
 /- admit /- sorryAx -/ still a comment -/
 def message := "sorry and admit"
 theorem complete : True := by trivial
-'''
+"""
     stripped = strip_lean_comments_and_strings(source)
     assert "theorem complete" in stripped
     assert find_placeholder(source) is None

@@ -75,9 +75,7 @@ def test_batch_records_task_error(tmp_path: Path, monkeypatch) -> None:
     project.mkdir()
     tasks = tmp_path / "tasks.jsonl"
     tasks.write_text(
-        json.dumps(
-            {"id": "broken", "task": "prove", "project": "project", "target": "Main.lean"}
-        )
+        json.dumps({"id": "broken", "task": "prove", "project": "project", "target": "Main.lean"})
         + "\n",
         encoding="utf-8",
     )

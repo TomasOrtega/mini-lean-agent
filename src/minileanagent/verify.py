@@ -24,9 +24,7 @@ _WARNING_PATTERN = re.compile(
     r"(?:declaration\s+uses\s+['\"]?sorry|uses\s+['\"]?sorryAx)",
     re.IGNORECASE,
 )
-_DECLARATION_PATTERN = re.compile(
-    r"[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*\Z"
-)
+_DECLARATION_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*\Z")
 
 
 class DeclarationFingerprintError(ValueError):
@@ -308,9 +306,7 @@ def _run_local(
     except subprocess.TimeoutExpired as exc:
         raw_output = exc.stdout or ""
         output = (
-            raw_output.decode(errors="replace")
-            if isinstance(raw_output, bytes)
-            else raw_output
+            raw_output.decode(errors="replace") if isinstance(raw_output, bytes) else raw_output
         )
         return CheckExecution(
             command=command,
@@ -433,10 +429,9 @@ def verify_target(
                 env=env,
             )
             if expected_type is not None:
-                statement_preserved = (
-                    normalize_declaration_type(actual_type)
-                    == normalize_declaration_type(expected_type)
-                )
+                statement_preserved = normalize_declaration_type(
+                    actual_type
+                ) == normalize_declaration_type(expected_type)
         except DeclarationFingerprintError as exc:
             fingerprint_error = str(exc)
             if expected_type is not None:

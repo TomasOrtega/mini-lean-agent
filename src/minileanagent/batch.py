@@ -86,9 +86,7 @@ def run_batch(
                     task.get("verification_timeout_seconds", verification_timeout_seconds)
                 ),
                 lean_command=(
-                    str(task["lean_command"])
-                    if task.get("lean_command")
-                    else lean_command
+                    str(task["lean_command"]) if task.get("lean_command") else lean_command
                 ),
                 model_class=model_class,
                 model_config=model_config,

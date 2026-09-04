@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test build docs check
+.PHONY: install lint format typecheck test build check
 
 install:
 	uv sync --all-extras
@@ -19,8 +19,5 @@ test:
 
 build:
 	uv build
-
-docs:
-	uv run mkdocs serve
 
 check: lint typecheck test build

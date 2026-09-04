@@ -43,7 +43,7 @@ jobs:
         run: |
           uv run mini-lean --help
           uv run mini-lean version
-          uv run mini-lean-submit --help
+          uv run mini-lean check --help
 
   tests:
     runs-on: ubuntu-latest
@@ -62,13 +62,18 @@ jobs:
       - name: Test
         run: uv run pytest --cov=minileanagent --cov-report=term-missing --cov-report=xml
 
-  lean-smoke:
+  comparator:
     runs-on: ubuntu-latest
+    env:
+      MINI_LEAN_TEST_COMPARATOR: ${{ runner.temp }}/comparator/.lake/build/bin/comparator
+      COMPARATOR_LEAN4EXPORT: ${{ runner.temp }}/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export
+      # This job checks our own fixtures; production requires upstream's sandbox setup.
+      COMPARATOR_LANDRUN: ${{ runner.temp }}/comparator/scripts/fake-landrun.sh
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: leanprover/lean-action@v1
         with:
-          lake-package-directory: examples/smoke
+          lake-package-directory: examples/core
           auto-config: false
           use-github-cache: true
       - uses: astral-sh/setup-uv@v10.0.1
@@ -77,41 +82,10 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --extra dev
-      - name: Accept a complete Lean file
-        run: uv run mini-lean check Smoke.lean --project examples/smoke
-      - name: Exercise the declaration-type guard
+      - name: Build Lean FRO comparator
         run: |
-          uv run python - <<'PY'
-          from pathlib import Path
-
-          from minileanagent.verify import capture_declaration_type, verify_target
-
-          project = Path("examples/smoke")
-          expected = capture_declaration_type(project, "Smoke.lean", "smoke")
-          accepted = verify_target(
-              project,
-              "Smoke.lean",
-              declaration="smoke",
-              expected_type=expected,
-          )
-          assert accepted.ok and accepted.statement_preserved is True, accepted
-
-          changed = project / "Changed.lean"
-          changed.write_text("theorem smoke : True := by trivial\n", encoding="utf-8")
-          try:
-              rejected = verify_target(
-                  project,
-                  changed.name,
-                  declaration="smoke",
-                  expected_type=expected,
-              )
-              assert not rejected.ok and rejected.statement_preserved is False, rejected
-          finally:
-              changed.unlink(missing_ok=True)
-          PY
-      - name: Reject a file containing sorry
-        run: |
-          if uv run mini-lean check WithSorry.lean --project examples/smoke; then
-            echo "Expected the verifier to reject WithSorry.lean"
-            exit 1
-          fi
+          git clone --depth 1 --branch v4.33.0 https://github.com/leanprover/comparator.git "$RUNNER_TEMP/comparator"
+          cd "$RUNNER_TEMP/comparator"
+          lake build lean4export comparator
+      - name: Check proofs with the real comparator
+        run: uv run pytest tests/test_comparator_integration.py

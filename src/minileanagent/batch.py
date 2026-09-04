@@ -50,6 +50,7 @@ def run_batch(
     command_timeout_seconds: int = 120,
     verification_timeout_seconds: int = 120,
     lean_command: str | None = None,
+    comparator: str = "comparator",
     model_class: str | None = None,
     model_config: Mapping[str, Any] | None = None,
     lean_config_path: Path | None = None,
@@ -67,11 +68,22 @@ def run_batch(
         trajectory = output_dir / f"{task_id}.traj.json"
         summary: dict[str, Any] = {"id": task_id, "trajectory_path": str(trajectory)}
         try:
+            declaration = task.get("declaration")
+            if not isinstance(declaration, str) or not declaration.strip():
+                raise ValueError("Each task requires a non-empty declaration string")
+            verification_project = task.get("verification_project")
+            if not isinstance(verification_project, str) or not verification_project.strip():
+                raise ValueError("Each task requires a non-empty verification_project string")
+            task_comparator = task.get("comparator", comparator)
+            if not isinstance(task_comparator, str) or not task_comparator.strip():
+                raise ValueError("comparator must be a non-empty executable string")
             outcome = run_task(
                 str(task["task"]),
                 project=_task_project(tasks_path, task["project"]),
                 target=Path(str(task["target"])),
-                declaration=str(task["declaration"]) if task.get("declaration") else None,
+                declaration=declaration,
+                verification_project=_task_project(tasks_path, verification_project),
+                comparator=task_comparator,
                 model_name=str(task["model"]) if task.get("model") else model_name,
                 trajectory_path=trajectory,
                 step_limit=int(task.get("step_limit", step_limit)),

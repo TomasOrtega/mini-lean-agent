@@ -30,9 +30,9 @@ Use a separate, trusted Lake project containing:
 `Solution.lean` is reserved: each verification overwrites it with the agent's target file. Other
 agent files and build configuration are not copied. Give each task its own verification project.
 
-Keep the agent in an isolated workspace and protect the verification project, dependencies, and
-toolchain with operating-system permissions. Separate paths alone provide no sandbox. See
-[SECURITY.md](SECURITY.md).
+Agent isolation is the deployment's responsibility; mini-lean-agent does not enforce it. Verification
+assumes the agent cannot modify the trusted challenge, project configuration, dependencies, or
+toolchain. Separate paths alone do not provide this protection. See [SECURITY.md](SECURITY.md).
 
 ## Solve
 

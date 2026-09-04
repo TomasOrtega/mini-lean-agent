@@ -1,7 +1,8 @@
 # Security policy
 
-The agent has mini-SWE-agent's bash access. A working directory does not restrict its access to
-files, credentials, programs, or the network. Run untrusted agents in an operating-system sandbox.
+Agent isolation is the caller's responsibility. The agent has mini-SWE-agent's bash access, and
+mini-lean-agent does not configure an operating-system sandbox. A working directory does not restrict
+access to files, credentials, programs, or the network. Isolate untrusted agents in your deployment.
 
 Keep the verification project's `Challenge.lean`, Lake configuration, imports, dependencies, and
 toolchain trusted and protected from the agent. The runner copies only the final target into the

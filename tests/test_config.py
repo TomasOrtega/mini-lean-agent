@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from jinja2 import StrictUndefined, Template
 
 from minileanagent.config import config_path, load_config, recursive_merge
 
@@ -35,14 +36,13 @@ def test_packaged_config_is_upstream_style() -> None:
     instance_template = config["agent"]["instance_template"]
     assert set(config) == {"agent", "environment", "model"}
     assert "helpful Lean 4 theorem-proving assistant" in system_template
-    assert "Recommended workflow" in instance_template
+    assert "Recommended Workflow" in instance_template
     assert "after each proof attempt" in instance_template
     assert "Read every error or warning" in instance_template
     assert "Do not change or weaken" in instance_template
     assert "new axioms" in instance_template
     assert "Use non-interactive commands" in instance_template
-    assert "mini-lean-submit" in instance_template
-    assert "lean-specific action interface" in instance_template.lower()
+    assert "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT" in instance_template
     assert "observation_template" in config["model"]
     assert config_path().name == "lean.yaml"
     assert config_path().is_file()
@@ -52,6 +52,19 @@ def test_load_config_returns_fresh_data() -> None:
     first = load_config()
     first["agent"]["cost_limit"] = 999
     assert load_config()["agent"]["cost_limit"] == 3.0
+
+
+def test_tool_error_prompt_is_inherited(monkeypatch: pytest.MonkeyPatch) -> None:
+    upstream_template = "{{ error }}\nFinish with `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`."
+    monkeypatch.setattr(
+        "minileanagent.config._load_upstream_config",
+        lambda: {"model": {"format_error_template": upstream_template}},
+    )
+    assert load_config()["model"]["format_error_template"] == upstream_template
+    template = Template(load_config()["model"]["format_error_template"], undefined=StrictUndefined)
+    rendered = template.render(error="No bash tool call found")
+    assert "No bash tool call found" in rendered
+    assert "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT" in rendered
 
 
 def test_user_config_is_an_overlay(tmp_path: Path) -> None:

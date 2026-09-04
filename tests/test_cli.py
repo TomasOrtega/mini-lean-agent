@@ -4,12 +4,44 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from minileanagent import cli
 from minileanagent.cli import app
 
 runner = CliRunner()
+
+
+@pytest.mark.parametrize("command", ["solve", "check"])
+def test_commands_require_verification_project(
+    fake_lean_project: tuple[Path, str], monkeypatch, command: str
+) -> None:
+    project, _ = fake_lean_project
+    calls: list[object] = []
+
+    def fake_call(*args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(to_dict=lambda: {"ok": True}, ok=True, verified=True)
+
+    monkeypatch.setattr(cli, "run_task", fake_call)
+    monkeypatch.setattr(cli, "verify_target", fake_call)
+    result = runner.invoke(
+        app,
+        [
+            command,
+            "Main.lean",
+            "--project",
+            str(project),
+            "--declaration",
+            "Demo.complete",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Missing option" in result.output
+    assert "--verification-project" in result.output
+    assert calls == []
 
 
 def test_version_reports_both_projects(monkeypatch) -> None:
@@ -20,25 +52,47 @@ def test_version_reports_both_projects(monkeypatch) -> None:
     assert "mini-swe-agent 2.4.6" in result.stdout
 
 
-def test_check_command(fake_lean_project: tuple[Path, str]) -> None:
-    project, command = fake_lean_project
+@pytest.mark.parametrize("ok", [True, False])
+def test_check_command(fake_lean_project: tuple[Path, str], monkeypatch, ok: bool) -> None:
+    project, _ = fake_lean_project
+    verifier = project.parent / "verifier"
+    seen: dict[str, object] = {}
+
+    def fake_verify(project_path, target, **kwargs):
+        seen.update(kwargs)
+        assert project_path == project
+        assert target == Path("Main.lean")
+        return SimpleNamespace(
+            ok=ok, reason="comparison result", target=target, output="comparator details"
+        )
+
+    monkeypatch.setattr(cli, "verify_target", fake_verify)
     result = runner.invoke(
         app,
-        ["check", "Main.lean", "--project", str(project), "--lean-command", command],
+        [
+            "check",
+            "Main.lean",
+            "--project",
+            str(project),
+            "--verification-project",
+            str(verifier),
+            "--declaration",
+            "Demo.complete",
+            "--comparator",
+            "/tools/my comparator",
+            "--timeout",
+            "42",
+        ],
     )
-    assert result.exit_code == 0
-    assert "accepted" in result.stdout
-
-    (project / "Main.lean").write_text(
-        "theorem Demo.bad : True := by sorry\n",
-        encoding="utf-8",
-    )
-    rejected = runner.invoke(
-        app,
-        ["check", "Main.lean", "--project", str(project), "--lean-command", command],
-    )
-    assert rejected.exit_code == 1
-    assert "placeholder" in rejected.stdout
+    assert result.exit_code == (0 if ok else 1)
+    assert "comparison result: Main.lean" in result.stdout
+    assert "comparator details" in result.stdout
+    assert seen == {
+        "verification_project": verifier,
+        "declaration": "Demo.complete",
+        "comparator": "/tools/my comparator",
+        "timeout_seconds": 42,
+    }
 
 
 def test_solve_delegates_to_runner(
@@ -74,6 +128,10 @@ def test_solve_delegates_to_runner(
             "Main.lean",
             "--declaration",
             "Demo.complete",
+            "--verification-project",
+            str(project.parent / "verifier"),
+            "--comparator",
+            "/tools/my comparator",
             "--model",
             "provider/model",
             "--lean-command",
@@ -85,6 +143,8 @@ def test_solve_delegates_to_runner(
     assert result.exit_code == 0
     assert seen["task"] == "replace the sorry"
     assert seen["declaration"] == "Demo.complete"
+    assert seen["verification_project"] == project.parent / "verifier"
+    assert seen["comparator"] == "/tools/my comparator"
     assert seen["model_name"] == "provider/model"
     assert seen["model_config"] == {"model_kwargs": {"temperature": 0}}
     assert "verified: true" in result.stdout
@@ -105,10 +165,52 @@ def test_solve_returns_failure_for_unverified_result(
     monkeypatch.setattr(cli, "run_task", lambda *args, **kwargs: outcome)
     result = runner.invoke(
         app,
-        ["solve", "prove", "--project", str(project), "--target", "Main.lean"],
+        [
+            "solve",
+            "prove",
+            "--project",
+            str(project),
+            "--target",
+            "Main.lean",
+            "--declaration",
+            "Demo.complete",
+            "--verification-project",
+            str(project.parent / "verifier"),
+        ],
     )
     assert result.exit_code == 1
     assert "verified: false" in result.stdout
+
+
+@pytest.mark.parametrize("command", ["solve", "check"])
+def test_commands_require_declaration(
+    fake_lean_project: tuple[Path, str], monkeypatch, command: str
+) -> None:
+    project, _ = fake_lean_project
+    calls: list[str] = []
+
+    def fake_run_task(task: str, **kwargs):
+        calls.append(task)
+        return SimpleNamespace(to_dict=lambda: {"verified": True}, verified=True)
+
+    monkeypatch.setattr(cli, "run_task", fake_run_task)
+    monkeypatch.setattr(cli, "verify_target", fake_run_task)
+    result = runner.invoke(
+        app,
+        [
+            command,
+            "Main.lean",
+            "--project",
+            str(project),
+            "--verification-project",
+            str(project.parent / "verifier"),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Missing option" in result.output
+    assert "--declaration" in result.output
+    assert calls == []
 
 
 def test_model_config_must_be_object(fake_lean_project: tuple[Path, str]) -> None:
@@ -122,6 +224,10 @@ def test_model_config_must_be_object(fake_lean_project: tuple[Path, str]) -> Non
             str(project),
             "--target",
             "Main.lean",
+            "--declaration",
+            "Demo.complete",
+            "--verification-project",
+            str(project.parent / "verifier"),
             "--model-config",
             "[]",
         ],
@@ -150,8 +256,17 @@ def test_doctor_resolves_command(fake_lean_project: tuple[Path, str], monkeypatc
     assert "command:" in result.stdout
 
 
-def test_check_json_output(fake_lean_project: tuple[Path, str]) -> None:
-    project, command = fake_lean_project
+def test_check_json_output(fake_lean_project: tuple[Path, str], monkeypatch) -> None:
+    project, _ = fake_lean_project
+
+    def fake_verify(*args, **kwargs):
+        assert kwargs["comparator"] == "comparator"
+        return SimpleNamespace(
+            ok=True,
+            to_dict=lambda: {"ok": True, "verification_project": str(project.parent / "verifier")},
+        )
+
+    monkeypatch.setattr(cli, "verify_target", fake_verify)
     result = runner.invoke(
         app,
         [
@@ -159,8 +274,10 @@ def test_check_json_output(fake_lean_project: tuple[Path, str]) -> None:
             "Main.lean",
             "--project",
             str(project),
-            "--lean-command",
-            command,
+            "--declaration",
+            "Demo.complete",
+            "--verification-project",
+            str(project.parent / "verifier"),
             "--json",
         ],
     )
@@ -192,6 +309,10 @@ def test_model_config_invalid_json(fake_lean_project: tuple[Path, str]) -> None:
             "prove",
             "--project",
             str(project),
+            "--declaration",
+            "Demo.complete",
+            "--verification-project",
+            str(project.parent / "verifier"),
             "--model-config",
             "{",
         ],
@@ -200,12 +321,42 @@ def test_model_config_invalid_json(fake_lean_project: tuple[Path, str]) -> None:
     assert "Invalid JSON" in result.output
 
 
-def test_check_invalid_target_is_usage_error(tmp_path: Path) -> None:
+def test_check_invalid_target_is_usage_error(tmp_path: Path, monkeypatch) -> None:
     project = tmp_path / "project"
     project.mkdir()
+
+    def fake_verify(*args, **kwargs):
+        raise ValueError("Target does not exist")
+
+    monkeypatch.setattr(cli, "verify_target", fake_verify)
     result = runner.invoke(
         app,
-        ["check", "Missing.lean", "--project", str(project)],
+        [
+            "check",
+            "Missing.lean",
+            "--project",
+            str(project),
+            "--declaration",
+            "Demo.complete",
+            "--verification-project",
+            str(tmp_path / "verifier"),
+        ],
     )
     assert result.exit_code == 2
     assert "does not exist" in result.output
+
+
+def test_batch_command_delegates_comparator(tmp_path: Path, monkeypatch) -> None:
+    tasks = tmp_path / "tasks.jsonl"
+    seen: dict[str, object] = {}
+
+    def fake_run_batch(tasks_path, **kwargs):
+        assert tasks_path == tasks
+        seen.update(kwargs)
+        return [{"verified": True}]
+
+    monkeypatch.setattr(cli, "run_batch", fake_run_batch)
+    result = runner.invoke(app, ["batch", str(tasks), "--comparator", "/tools/my comparator"])
+    assert result.exit_code == 0
+    assert seen["comparator"] == "/tools/my comparator"
+    assert "completed: 1" in result.output

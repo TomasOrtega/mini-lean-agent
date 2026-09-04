@@ -41,20 +41,16 @@ dev = [
   "twine>=6.0",
   "types-PyYAML>=6.0",
 ]
-docs = [
-  "mkdocs-material>=9.6",
-]
 
 [project.urls]
 Homepage = "https://github.com/TomasOrtega/mini-lean-agent"
-Documentation = "https://tomasortega.github.io/mini-lean-agent/"
+Documentation = "https://github.com/TomasOrtega/mini-lean-agent#readme"
 Repository = "https://github.com/TomasOrtega/mini-lean-agent"
 Issues = "https://github.com/TomasOrtega/mini-lean-agent/issues"
 
 [project.scripts]
 mini-lean = "minileanagent.cli:app"
 mini-lean-agent = "minileanagent.cli:app"
-mini-lean-submit = "minileanagent.submit:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -77,7 +73,7 @@ quote-style = "double"
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
 testpaths = ["tests"]
-markers = ["integration: requires the installed mini-swe-agent dependency"]
+markers = ["integration: exercises installed upstream tools"]
 
 [tool.coverage.run]
 source = ["minileanagent"]

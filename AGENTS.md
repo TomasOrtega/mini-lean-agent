@@ -1,29 +1,23 @@
 # Repository guide for coding agents
 
-mini-lean-agent is a thin downstream specialization of mini-SWE-agent. Do not introduce a second
-agent loop, model adapter, shell implementation, trajectory schema, or tool-calling protocol.
-
-## Ownership boundary
-
-Upstream mini-SWE-agent owns:
-
-- the agent loop and limits
-- model-provider handling
-- the bash tool
-- subprocess execution
-- trajectory serialization and inspection
+Keep this a thin specialization of mini-SWE-agent. Upstream owns the agent loop, model providers,
+bash execution, completion sentinel, and trajectory format. Do not reimplement them.
 
 This repository owns:
 
-- `src/minileanagent/config/lean.yaml`: the Lean prompt
-- `src/minileanagent/verify.py`: fixed-target Lean evaluation
-- `src/minileanagent/submit.py`: verified completion through the upstream sentinel
-- `src/minileanagent/runner.py`: direct construction of upstream classes
-- `src/minileanagent/batch.py`: a small sequential JSONL adapter
-- `src/minileanagent/cli.py`: Lean-facing commands
+- `src/minileanagent/config/lean.yaml`: the Lean prompt.
+- `src/minileanagent/runner.py`: construction of upstream classes and final evaluation.
+- `src/minileanagent/verify.py`: staging the target and invoking Lean FRO's comparator.
+- `src/minileanagent/batch.py`: sequential JSONL tasks.
+- `src/minileanagent/cli.py`: Lean-facing commands.
 
-Native Lean tools, Kimina, retrieval, tactic environments, and proof search must remain explicit
-ablations rather than changes to the default baseline.
+Comparator owns statement comparison, axiom validation, and kernel checking. Do not add a Python
+Lean parser or declaration fingerprint. Keep the trusted verification project separate from the
+agent workspace; copy only the final target into its reserved `Solution.lean`. Do not compile
+untrusted solutions in the verification project outside comparator.
+
+Native Lean tools, retrieval, and proof search must remain explicit ablations.
+Keep user documentation in README.md rather than adding another documentation site.
 
 ## Required checks
 

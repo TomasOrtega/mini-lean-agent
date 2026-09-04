@@ -14,12 +14,11 @@ from typing import Any
 from minileanagent import __version__
 from minileanagent.config import load_config, recursive_merge
 from minileanagent.verify import (
-    DeclarationFingerprintError,
     VerificationResult,
-    capture_declaration_type,
-    encode_expected_type,
     project_lean_command,
     resolve_target,
+    resolve_verification_project,
+    validate_declaration_name,
     verify_target,
 )
 
@@ -45,7 +44,6 @@ class RunOutcome:
     upstream_submission: str
     upstream_result: dict[str, Any]
     verification: VerificationResult
-    expected_type: str | None
     model_cost: float
     model_calls: int
 
@@ -58,7 +56,6 @@ class RunOutcome:
             "upstream_submission": self.upstream_submission,
             "upstream_result": self.upstream_result,
             "verification": self.verification.to_dict(),
-            "expected_type": self.expected_type,
             "model_cost": self.model_cost,
             "model_calls": self.model_calls,
         }
@@ -100,7 +97,6 @@ def _validate_limits(
     cost_limit: float,
     wall_time_limit_seconds: int,
     command_timeout_seconds: int,
-    verification_timeout_seconds: int,
 ) -> None:
     if step_limit < 0:
         raise ValueError("step_limit must be non-negative")
@@ -110,29 +106,6 @@ def _validate_limits(
         raise ValueError("wall_time_limit_seconds must be non-negative")
     if command_timeout_seconds <= 0:
         raise ValueError("command_timeout_seconds must be positive")
-    if verification_timeout_seconds <= 0:
-        raise ValueError("verification_timeout_seconds must be positive")
-
-
-def _runtime_environment(
-    *,
-    project: Path,
-    target: Path,
-    declaration: str | None,
-    expected_type: str | None,
-    command_template: str | None,
-    timeout_seconds: int,
-) -> dict[str, str]:
-    environment = {
-        "MINI_LEAN_PROJECT": str(project),
-        "MINI_LEAN_TARGET": str(target),
-        "MINI_LEAN_DECLARATION": declaration or "",
-        "MINI_LEAN_EXPECTED_TYPE": encode_expected_type(expected_type),
-        "MINI_LEAN_VERIFY_TIMEOUT": str(timeout_seconds),
-    }
-    if command_template:
-        environment["MINI_LEAN_COMMAND"] = command_template
-    return environment
 
 
 def build_agent(
@@ -141,25 +114,23 @@ def build_agent(
     target: Path | str,
     model_name: str | None,
     trajectory_path: Path,
-    declaration: str | None = None,
-    expected_type: str | None = None,
+    declaration: str,
     step_limit: int = 30,
     cost_limit: float = 3.0,
     wall_time_limit_seconds: int = 900,
     command_timeout_seconds: int = 120,
-    verification_timeout_seconds: int = 120,
     lean_command: str | None = None,
     model_class: str | None = None,
     model_config: Mapping[str, Any] | None = None,
     lean_config_path: Path | str | None = None,
 ) -> Any:
     """Construct upstream ``DefaultAgent``, model, and ``LocalEnvironment``."""
+    declaration = validate_declaration_name(declaration)
     _validate_limits(
         step_limit=step_limit,
         cost_limit=cost_limit,
         wall_time_limit_seconds=wall_time_limit_seconds,
         command_timeout_seconds=command_timeout_seconds,
-        verification_timeout_seconds=verification_timeout_seconds,
     )
     upstream = _load_upstream()
     project_path, target_relative, _ = resolve_target(project, target)
@@ -181,16 +152,6 @@ def build_agent(
     if not isinstance(environment_env, Mapping):
         raise ValueError("The Lean config's environment.env section must be a mapping")
     child_env = {str(key): str(value) for key, value in environment_env.items()}
-    child_env.update(
-        _runtime_environment(
-            project=project_path,
-            target=target_relative,
-            declaration=declaration,
-            expected_type=expected_type,
-            command_template=lean_command,
-            timeout_seconds=verification_timeout_seconds,
-        )
-    )
     environment_config.pop("cwd", None)
     environment_config.pop("timeout", None)
     environment = upstream.local_environment(
@@ -217,8 +178,7 @@ def build_agent(
         {
             "lean_project": str(project_path),
             "lean_target": str(target_relative),
-            "lean_declaration": declaration or "",
-            "lean_statement_guarded": declaration is not None,
+            "lean_declaration": declaration,
             "lean_check_command": shlex.join(
                 project_lean_command(project_path, target_relative, lean_command)
             ),
@@ -240,8 +200,10 @@ def run_task(
     *,
     project: Path | str,
     target: Path | str,
+    declaration: str,
+    verification_project: Path | str,
+    comparator: str = "comparator",
     model_name: str | None = None,
-    declaration: str | None = None,
     trajectory_path: Path | None = None,
     step_limit: int = 30,
     cost_limit: float = 3.0,
@@ -254,29 +216,16 @@ def run_task(
     lean_config_path: Path | str | None = None,
 ) -> RunOutcome:
     """Run upstream mini-SWE-agent unchanged, then evaluate the fixed target."""
+    declaration = validate_declaration_name(declaration)
+    if verification_timeout_seconds <= 0:
+        raise ValueError("verification_timeout_seconds must be positive")
     project_path, target_relative, _ = resolve_target(project, target)
+    verifier_path = resolve_verification_project(project_path, verification_project)
     output_path = (
         trajectory_path.expanduser().resolve()
         if trajectory_path is not None
         else default_trajectory_path(project_path)
     )
-
-    expected_type: str | None = None
-    if declaration:
-        try:
-            expected_type = capture_declaration_type(
-                project_path,
-                target_relative,
-                declaration,
-                command_template=lean_command,
-                timeout_seconds=verification_timeout_seconds,
-            )
-        except DeclarationFingerprintError as exc:
-            raise ValueError(
-                "Could not fingerprint the protected declaration before the run. "
-                "The initial target must elaborate, usually with `sorry` in its proof.\n"
-                f"{exc}"
-            ) from exc
 
     agent = build_agent(
         project=project_path,
@@ -284,12 +233,10 @@ def run_task(
         model_name=model_name,
         trajectory_path=output_path,
         declaration=declaration,
-        expected_type=expected_type,
         step_limit=step_limit,
         cost_limit=cost_limit,
         wall_time_limit_seconds=wall_time_limit_seconds,
         command_timeout_seconds=command_timeout_seconds,
-        verification_timeout_seconds=verification_timeout_seconds,
         lean_command=lean_command,
         model_class=model_class,
         model_config=model_config,
@@ -303,14 +250,12 @@ def run_task(
     upstream_exit_status = str(upstream_result.get("exit_status", ""))
     upstream_submission = str(upstream_result.get("submission", ""))
 
-    # This independent check is the evaluator. A model cannot obtain a successful
-    # mini-lean result by directly printing mini-SWE-agent's completion sentinel.
     verification = verify_target(
         project_path,
         target_relative,
         declaration=declaration,
-        expected_type=expected_type,
-        command_template=lean_command,
+        verification_project=verifier_path,
+        comparator=comparator,
         timeout_seconds=verification_timeout_seconds,
     )
     verified = verification.ok
@@ -325,7 +270,7 @@ def run_task(
         "project": str(project_path),
         "target": str(target_relative),
         "declaration": declaration,
-        "expected_type": expected_type,
+        "verification_project": str(verifier_path),
         "status": status,
         "verified": verified,
         "upstream_exit_status": upstream_exit_status,
@@ -342,7 +287,6 @@ def run_task(
         upstream_submission=upstream_submission,
         upstream_result=upstream_result,
         verification=verification,
-        expected_type=expected_type,
         model_cost=float(getattr(agent, "cost", 0.0)),
         model_calls=int(getattr(agent, "n_calls", 0)),
     )

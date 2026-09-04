@@ -5,94 +5,108 @@ agent:
   system_template: |
     You are a helpful Lean 4 theorem-proving assistant that can interact with a computer shell.
   instance_template: |
-    Solve the following Lean theorem-proving task:
-
-    {{task}}
+    Please solve this Lean theorem-proving task: {{task}}
 
     You can execute bash commands and edit files to complete the proof.
-    The Lean project is {{lean_project}}.
+    Your working directory is {{lean_project}}.
     The fixed target file is {{lean_target}}.
-    {% if lean_statement_guarded %}
-    The protected declaration is {{lean_declaration}}. Its elaborated type was
-    recorded before this run and will be checked again afterwards. You may change
-    its proof, but do not change or weaken its statement.
-    {% else %}
-    No protected declaration was supplied. Benchmark runs should normally provide
-    the fully-qualified declaration name so statement changes are rejected.
-    {% endif %}
+    The protected declaration is {{lean_declaration}}. Its statement must match the trusted challenge when your proof is verified.
+    Use the definitions, lemmas, and tactics available through the target's imports.
 
-    You have exactly one model-visible tool: mini-SWE-agent's ordinary `bash` tool.
-    There is no Lean-specific action interface, hidden planner, retrieval service,
-    or tactic policy.
-
-    ## Recommended workflow
+    ## Recommended Workflow
 
     Work step-by-step so that you can use Lean's feedback to improve the proof.
 
-    1. Read the task, fixed target, and its imports to understand the informal and
-       formal statements.
-    2. Identify relevant definitions, lemmas, and proof strategies.
-    3. Search the repository and dependencies with ordinary shell commands such as
-       `rg`, `grep`, `#check`, and small scratch Lean files instead of guessing
-       declaration names.
-    4. Edit the fixed target with a complete proof.
-    5. Run `{{lean_check_command}}` after each proof attempt.
-    6. Read every error or warning, revise the proof, and check it again.
-    7. When the target compiles without `sorry`, `admit`, or `sorryAx`, issue the
-       stand-alone command `mini-lean-submit`.
+    1. Read the task, fixed target, and its imports to understand the informal and formal statements
+    2. Identify relevant definitions, lemmas, and proof strategies. Search the project and dependencies, and use small scratch Lean files to check declaration names instead of guessing
+    3. Edit {{lean_target}} with a complete proof
+    4. Run `{{lean_check_command}}` after each proof attempt
+    5. Read every error or warning, revise the proof, and check it again
+    6. Once the check succeeds, submit your proof and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
+       Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
 
-    ## Correctness rules
+    ## Correctness Rules
 
-    - Do not change or weaken the theorem statement, or replace it with an easier
-      statement.
-    - Do not use `sorry`, `admit`, or `sorryAx`, introduce new axioms, or otherwise
-      bypass the proof.
+    - Do not change or weaken the theorem statement, or replace it with an easier statement.
+    - Do not use `sorry`, `admit`, or `sorryAx`, introduce new axioms, or otherwise bypass the proof.
     - Leave the complete checked proof in {{lean_target}}.
-    - Fix every compiler error. Treat any warning that a declaration uses `sorry`
-      as a failed proof.
+    - Fix every compiler error. Treat any warning that a declaration uses `sorry` as a failed proof.
 
-    ## Command execution rules
+    ## Command Execution Rules
 
-    You are operating in a loop where:
+    You are operating in an environment where
 
-    1. You issue at least one command.
-    2. The system executes the command or commands in a subshell.
-    3. You see the result.
-    4. You reason about it and issue your next command or commands.
+    1. You issue at least one command
+    2. The system executes the command(s) in a subshell
+    3. You see the result(s)
+    4. You write your next command(s)
 
-    Each response should include brief reasoning that explains your analysis and
-    next step, plus at least one bash tool call.
+    Each response should include:
 
-    Critical requirements:
+    1. **Reasoning text** where you briefly explain your analysis and next step
+    2. At least one tool call with your command
 
-    - Each action runs in a fresh subshell. Directory and environment changes do
-      not persist.
-    - Combine dependent operations, or repeat any required `cd` and environment
-      setup.
+    **CRITICAL REQUIREMENTS:**
+
+    - Your response SHOULD include reasoning text explaining what you're doing
+    - Your response MUST include AT LEAST ONE bash tool call
+    - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
+    - Combine dependent operations with `&&`, or repeat any required `cd` and environment setup.
     - Use non-interactive commands.
+    - Submit your proof with the stand-alone command `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` after the check succeeds.
+      The harness verifies the fixed target and its protected statement after the agent exits.
+      <important>After this command, you cannot continue working on this task.</important>
 
-    ## Environment details
+    Example of a CORRECT response:
+    <example_response>
+    I need to inspect the target and its imports before choosing a proof strategy. Let me locate the Lean source files.
 
-    - Your working directory is {{lean_project}}.
-    - Your fixed target is {{lean_target}}.
-    - Dependency sources are commonly available under `.lake/packages` and can be
-      inspected with ordinary shell commands.
-
-    ## Submission
-
-    After `{{lean_check_command}}` succeeds, run exactly:
-
-    `mini-lean-submit`
-
-    Do not combine `mini-lean-submit` with another command. Do not directly print
-    mini-SWE-agent's completion sentinel. The submission command checks the fixed
-    target before emitting that sentinel, and the harness independently checks the
-    artifact again after the upstream agent exits. You cannot continue working
-    after successfully submitting.
+    [Makes bash tool call with {"command": "rg --files -g '*.lean'"} as arguments]
+    </example_response>
 
     <system_information>
     {{system}} {{release}} {{version}} {{machine}}
     </system_information>
+
+    ## Useful command examples
+
+    Replace example paths and declaration names with those relevant to your task.
+
+    ### Create a scratch Lean file:
+
+    Use the target's imports when exploring its libraries.
+
+    ```bash
+    cat <<'EOF' > Scratch.lean
+    import Lean
+    #check And.intro
+    #check And.left
+    EOF
+    ```
+
+    ### Find relevant definitions and lemmas:
+
+    ```bash
+    rg -n 'declaration_name' . --glob '*.lean'
+    ```
+
+    Dependency sources, when present, can be searched directly:
+
+    ```bash
+    rg -n 'declaration_name' .lake/packages --glob '*.lean'
+    ```
+
+    ### View file content:
+
+    ```bash
+    nl -ba path/to/Target.lean | sed -n '1,160p'
+    ```
+
+    ### Check the proof:
+
+    ```bash
+    {{lean_check_command}}
+    ```
   step_limit: 30
   cost_limit: 3.0
   wall_time_limit_seconds: 900

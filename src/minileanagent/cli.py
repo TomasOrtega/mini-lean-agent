@@ -69,22 +69,29 @@ def root(
 @app.command()
 def solve(
     task: Annotated[str, typer.Argument(help="Lean task or theorem-proving instruction")],
-    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
-    target: Annotated[Path, typer.Option("--target", "-t")] = DEFAULT_TARGET,
     declaration: Annotated[
-        str | None,
+        str,
         typer.Option(
             "--declaration",
             "-d",
-            help="Fully-qualified declaration whose type must remain unchanged",
+            help="Fully-qualified theorem to compare",
         ),
-    ] = None,
+    ],
+    verification_project: Annotated[
+        Path,
+        typer.Option(
+            "--verification-project",
+            help="Trusted Lake project with Challenge and Solution libraries",
+        ),
+    ],
+    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
+    target: Annotated[Path, typer.Option("--target", "-t")] = DEFAULT_TARGET,
     model: Annotated[str | None, typer.Option("--model", "-m")] = None,
     trajectory: Annotated[Path | None, typer.Option("--trajectory", "-o")] = None,
     config: Annotated[Path | None, typer.Option("--config", "-c")] = None,
     lean_command: Annotated[
         str | None,
-        typer.Option("--lean-command", help="Checker command, with optional {target}"),
+        typer.Option("--lean-command", help="Exploratory Lean command, with optional {target}"),
     ] = None,
     model_class: Annotated[str | None, typer.Option("--model-class")] = None,
     model_config: Annotated[
@@ -96,6 +103,9 @@ def solve(
     wall_time_limit: Annotated[int, typer.Option("--wall-time-limit")] = 900,
     command_timeout: Annotated[int, typer.Option("--command-timeout")] = 120,
     verification_timeout: Annotated[int, typer.Option("--verification-timeout")] = 120,
+    comparator: Annotated[
+        str, typer.Option("--comparator", help="LeanFRO comparator executable")
+    ] = "comparator",
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Run upstream mini-SWE-agent on one fixed Lean target."""
@@ -106,6 +116,8 @@ def solve(
             project=project_path,
             target=target,
             declaration=declaration,
+            verification_project=verification_project,
+            comparator=comparator,
             model_name=model,
             trajectory_path=trajectory or default_trajectory_path(project_path),
             step_limit=step_limit,
@@ -138,25 +150,32 @@ def solve(
 @app.command("check")
 def check_command(
     target: Annotated[Path, typer.Argument(help="Lean file to verify")],
-    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
     declaration: Annotated[
-        str | None,
-        typer.Option("--declaration", "-d", help="Declaration whose type to report"),
-    ] = None,
-    lean_command: Annotated[
-        str | None,
-        typer.Option("--lean-command", help="Checker command, with optional {target}"),
-    ] = None,
+        str,
+        typer.Option("--declaration", "-d", help="Fully-qualified theorem to compare"),
+    ],
+    verification_project: Annotated[
+        Path,
+        typer.Option(
+            "--verification-project",
+            help="Trusted Lake project with Challenge and Solution libraries",
+        ),
+    ],
+    project: Annotated[Path, typer.Option("--project", "-p")] = DEFAULT_PROJECT,
+    comparator: Annotated[
+        str, typer.Option("--comparator", help="LeanFRO comparator executable")
+    ] = "comparator",
     timeout: Annotated[int, typer.Option("--timeout")] = 120,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Compile one target and reject ``sorry``, ``admit``, and ``sorryAx``."""
+    """Compare a target against its trusted challenge with LeanFRO comparator."""
     try:
         result = verify_target(
             project,
             target,
             declaration=declaration,
-            command_template=lean_command,
+            verification_project=verification_project,
+            comparator=comparator,
             timeout_seconds=timeout,
         )
     except (OSError, ValueError) as exc:
@@ -167,8 +186,6 @@ def check_command(
         typer.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     else:
         typer.echo(f"{result.reason}: {result.target}")
-        if result.actual_type:
-            typer.echo(f"declaration_type: {result.actual_type}")
         if result.output:
             typer.echo(result.output.rstrip())
     if not result.ok:
@@ -187,7 +204,6 @@ def doctor(
         typer.echo(f"mini-lean-agent: {__version__}")
         typer.echo(f"mini-swe-agent: {installed_upstream_version()}")
         typer.echo(f"project: {project_path}")
-        typer.echo(f"mini-lean-submit: {shutil.which('mini-lean-submit') or 'not found'}")
         if target is not None:
             _, relative, _ = resolve_target(project_path, target)
             command = project_lean_command(project_path, relative, lean_command)
@@ -215,6 +231,9 @@ def batch(
     model: Annotated[str | None, typer.Option("--model", "-m")] = None,
     config: Annotated[Path | None, typer.Option("--config", "-c")] = None,
     lean_command: Annotated[str | None, typer.Option("--lean-command")] = None,
+    comparator: Annotated[
+        str, typer.Option("--comparator", help="LeanFRO comparator executable")
+    ] = "comparator",
     model_class: Annotated[str | None, typer.Option("--model-class")] = None,
     model_config: Annotated[str | None, typer.Option("--model-config")] = None,
     step_limit: Annotated[int, typer.Option("--step-limit")] = 30,
@@ -235,6 +254,7 @@ def batch(
             command_timeout_seconds=command_timeout,
             verification_timeout_seconds=verification_timeout,
             lean_command=lean_command,
+            comparator=comparator,
             model_class=model_class,
             model_config=_parse_model_config(model_config),
             lean_config_path=config,

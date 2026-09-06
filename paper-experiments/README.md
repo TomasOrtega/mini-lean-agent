@@ -20,13 +20,14 @@ A5, where it reached the spending cap at $50.104620. Both campaigns used two wor
 started fresh attempts, and recorded complete accounting without infrastructure
 failures. We did not import pilot results or another campaign's proofs.
 
-The original Gemini 3.8 Flash comparison solved 7/12 problems with mini-Lean-agent
+The Gemini 3.8 Flash comparison solves 7/12 problems with mini-Lean-agent
 and 4/12 with AxProverBase at the $2 stopping cap; Opus 4.5 solved 0/12 at $2 and $5.
 The paper credits a proof from the final request dispatched below a stopping cap,
 including AxProverBase's A1 proof at $2.00150925. Strict scoring gives AxProverBase
-3/12. The reported comparison uses the completed B2 mini and B6 Ax runs. Their raw
-registrations remain unchanged. The low-budget costs per verified proof are $2.09
-for mini-Lean-agent and $4.71 for AxProverBase; all reported model runs cost $251.823705.
+3/12. The reported comparison uses the selected B2 mini, B3 Ax, and B6 Ax runs.
+Their raw registrations remain unchanged. The low-budget costs per verified proof
+are $2.09 for mini-Lean-agent and $5.24 for AxProverBase; all reported model runs
+cost $253.939087.
 
 ## Protocol and isolation
 
@@ -190,6 +191,7 @@ available; trajectories, credentials, and dependency caches do not ship in Git.
 PAPER_RESULTS=.mini-lean-agent/paper-remaining-2026-09-04/final-report
 PAPER_RETRY=.mini-lean-agent/diagnostic-B6-Ax-2026-09-05
 PAPER_REPLACEMENT=.mini-lean-agent/replacement-B2-mini-2026-09-05
+PAPER_B3=.mini-lean-agent/replacement-B3-Ax-2026-09-06-r2
 uv run --project paper-experiments python paper-experiments/make_tables.py \
   --combined "$PAPER_RESULTS/combined.json" \
   --annotations "$PAPER_RESULTS/annotations/pooled-trace-statistics.json" \
@@ -201,6 +203,8 @@ uv run --project paper-experiments python paper-experiments/make_tables.py \
   --replacement-manifest-sha256 0f6bf34e6d24ee72c448dcc19f9a1a796ca544935c8138e9fa37ff5e0728b15c \
   --replacement-annotation "$PAPER_REPLACEMENT/analysis/mini-lean-B2-mini-annotation.json" \
   --replacement-annotation-sha256 096a4482c296c674bf591b5be79793496f40477dcdc037c2e122dd32f422967d \
+  --replacement "$PAPER_B3" \
+  --replacement-manifest-sha256 dad3cc48ce0baeb7c831c65018d5344eb7a141af50adf8ec5490367f89bca533 \
   --astra-experiment .mini-lean-agent/paper-astra-2026-09-05/experiment \
   --fable-experiment .mini-lean-agent/paper-fable-2026-09-05/experiment \
   --budget-policy last-dispatch --output .mini-lean-agent/final-paper-tables
@@ -208,7 +212,9 @@ uv run --project paper-experiments python paper-experiments/make_tables.py \
 
 The output directory must be new. `last-dispatch` applies the paper's final-request
 allowance only at a stopping cap; interior checkpoints and call/time limits remain
-strict. `--budget-policy strict` reconstructs the original budget-qualified scoring.
+strict. `--budget-policy strict` scores the selected attempts without the final-request
+allowance. Repeat `--replacement` and its manifest hash in matching order for each
+declared replacement.
 The generator selects the completed B6 Ax retry for both low and extended results,
 while preserving its archived diagnostic registration. Reported costs count each
 selected attempt once, including continuations, and exclude smoke tests and unselected

@@ -1,0 +1,502 @@
+{
+  "components": {
+    "schemas": {
+      "Body_search_search_post": {
+        "properties": {
+          "num_results": {
+            "default": 10,
+            "exclusiveMinimum": 0.0,
+            "maximum": 150.0,
+            "title": "Num Results",
+            "type": "integer"
+          },
+          "query": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Query",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "Body_search_search_post",
+        "type": "object"
+      },
+      "DailySearchCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "count"
+        ],
+        "title": "DailySearchCount",
+        "type": "object"
+      },
+      "Feedback": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "cancel": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel"
+          },
+          "declaration": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Declaration",
+            "type": "array"
+          }
+        },
+        "required": [
+          "declaration",
+          "action"
+        ],
+        "title": "Feedback",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Record": {
+        "additionalProperties": true,
+        "properties": {
+          "docstring": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docstring"
+          },
+          "informal_description": {
+            "title": "Informal Description",
+            "type": "string"
+          },
+          "informal_name": {
+            "title": "Informal Name",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "abbrev",
+              "axiom",
+              "classInductive",
+              "definition",
+              "example",
+              "inductive",
+              "instance",
+              "opaque",
+              "structure",
+              "theorem",
+              "proofWanted"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "module_name": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Module Name",
+            "type": "array"
+          },
+          "name": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Name",
+            "type": "array"
+          },
+          "signature": {
+            "title": "Signature",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "module_name",
+          "kind",
+          "name",
+          "signature",
+          "type",
+          "value",
+          "docstring",
+          "informal_name",
+          "informal_description"
+        ],
+        "title": "Record",
+        "type": "object"
+      },
+      "Stats": {
+        "properties": {
+          "searches_by_day": {
+            "items": {
+              "$ref": "#/components/schemas/DailySearchCount"
+            },
+            "title": "Searches By Day",
+            "type": "array"
+          },
+          "searches_by_week": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklySearchCount"
+            },
+            "title": "Searches By Week",
+            "type": "array"
+          },
+          "total_searches": {
+            "title": "Total Searches",
+            "type": "integer"
+          },
+          "weekly_searches": {
+            "title": "Weekly Searches",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_searches",
+          "weekly_searches",
+          "searches_by_day",
+          "searches_by_week"
+        ],
+        "title": "Stats",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WeeklySearchCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "week_start": {
+            "format": "date",
+            "title": "Week Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week_start",
+          "count"
+        ],
+        "title": "WeeklySearchCount",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/augment": {
+      "post": {
+        "operationId": "augment_augment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Query",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Augment Augment Post",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Augment"
+      }
+    },
+    "/feedback": {
+      "post": {
+        "operationId": "feedback_feedback_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "title": "Session",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Feedback"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feedback"
+      }
+    },
+    "/fetch": {
+      "post": {
+        "operationId": "fetch_fetch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "minimum": 0.0,
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "title": "Query",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Record"
+                  },
+                  "title": "Response Fetch Fetch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fetch"
+      }
+    },
+    "/search": {
+      "post": {
+        "operationId": "search_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_search_search_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "title": "Response Search Search Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search"
+      }
+    },
+    "/stats": {
+      "get": {
+        "operationId": "stats_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stats"
+      }
+    }
+  }
+}

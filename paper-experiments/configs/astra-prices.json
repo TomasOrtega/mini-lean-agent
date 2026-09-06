@@ -1,0 +1,13 @@
+{
+  "as_of": "2026-09-05",
+  "source": "https://openrouter.ai/api/v1/models/openai/gpt-6-astra/endpoints ; OpenAI standard endpoint. Frozen estimates use short-context rates per million tokens; requests over 272000 input tokens use 2x input/cache and 1.5x output rates at the provider. Actual usage.cost plus separately billed BYOK upstream inference cost determines all spending limits, including long-context requests.",
+  "models": {
+    "gpt-6-astra": {
+      "input": "10",
+      "output": "50",
+      "reasoning": "50",
+      "cache_read": "1",
+      "cache_write": "12.5"
+    }
+  }
+}

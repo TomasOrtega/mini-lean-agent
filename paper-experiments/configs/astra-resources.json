@@ -1,0 +1,8 @@
+{
+  "agent_cpus": 2,
+  "agent_memory_gib": 6,
+  "docker_reserve_gib": 2,
+  "evaluator_cpus": 2,
+  "evaluator_memory_gib": 6,
+  "workers": 2
+}

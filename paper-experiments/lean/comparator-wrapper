@@ -1,0 +1,14 @@
+#!/opt/venv/bin/python3
+"""Add native-parser-enumerated helpers to Comparator's checked theorem set."""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+configuration = Path(sys.argv[1])
+specification = json.loads(configuration.read_text())
+policy = json.loads(Path("policy-report.json").read_text())
+specification["theorem_names"] = policy["theorem_names"]
+configuration.write_text(json.dumps(specification))
+os.execv("/opt/comparator/.lake/build/bin/comparator", ["comparator", str(configuration)])

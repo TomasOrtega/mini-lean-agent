@@ -1,0 +1,27 @@
+{
+  "gpt-6-astra": {
+    "provider": "openrouter",
+    "requested_model": "openai/gpt-6-astra",
+    "mini_model": "openrouter/openai/gpt-6-astra",
+    "max_output_tokens": 128000,
+    "thinking": {
+      "level": "max"
+    },
+    "cache_policy": "implicit_only",
+    "max_attempts": 3,
+    "request_timeout_seconds": 1800,
+    "canonical_model": "openai/gpt-6-astra-20260903",
+    "context_length": 1050000,
+    "service_tier": "default",
+    "openrouter_provider": {
+      "only": [
+        "openai"
+      ],
+      "order": [
+        "openai"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true
+    }
+  }
+}

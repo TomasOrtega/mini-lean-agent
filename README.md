@@ -84,6 +84,11 @@ mini-extra inspect results/core-and-comm.traj.json
 The batch adapter writes upstream trajectories and `summary.jsonl`. Individual solves default to
 `<project>/.mini-lean-agent/trajectories/`. Verification metadata lives under `info.mini_lean_agent`.
 
+## Paper experiments
+
+See [paper-experiments/README.md](paper-experiments/README.md) for the Putnam 2025 protocol,
+setup, execution, reports, and final paper-table generation.
+
 ## Development
 
 ```bash
@@ -102,3 +107,6 @@ Set `MINI_LEAN_TEST_COMPARATOR` to a built comparator to run the real proof-veri
 MIT; see [LICENSE](LICENSE). mini-SWE-agent's attribution and license are preserved in
 [NOTICE.md](NOTICE.md) and [third_party/mini-swe-agent-LICENSE.md](third_party/mini-swe-agent-LICENSE.md).
 Comparator is an external tool maintained by Lean FRO; follow its upstream license and setup.
+The optional paper experiment environment depends on AxProverBase (AGPL-3.0-only).
+Its Docker seccomp profile retains the upstream Apache-2.0 license and pinned provenance
+in `paper-experiments/configs`.

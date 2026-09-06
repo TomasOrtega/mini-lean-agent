@@ -1,0 +1,54 @@
+{
+  "gemini-3.8-flash": {
+    "provider": "openrouter",
+    "requested_model": "google/gemini-3.8-flash",
+    "mini_model": "openrouter/google/gemini-3.8-flash",
+    "ax_model": "openrouter:google/gemini-3.8-flash",
+    "temperature": 1.0,
+    "max_output_tokens": 32768,
+    "thinking": {
+      "level": "high"
+    },
+    "cache_policy": "implicit_only",
+    "max_attempts": 3,
+    "request_timeout_seconds": 600,
+    "canonical_model": "google/gemini-3.8-flash-20260902",
+    "context_length": 1048576,
+    "openrouter_provider": {
+      "only": [
+        "google-ai-studio"
+      ],
+      "order": [
+        "google-ai-studio"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true
+    }
+  },
+  "claude-opus-4-5": {
+    "provider": "openrouter",
+    "requested_model": "anthropic/claude-opus-4.5",
+    "mini_model": "openrouter/anthropic/claude-opus-4.5",
+    "temperature": 1.0,
+    "max_output_tokens": 32768,
+    "thinking": {
+      "type": "enabled",
+      "budget_tokens": 16384
+    },
+    "cache_policy": "disabled",
+    "max_attempts": 3,
+    "request_timeout_seconds": 600,
+    "canonical_model": "anthropic/claude-4.5-opus-20251124",
+    "context_length": 200000,
+    "openrouter_provider": {
+      "only": [
+        "anthropic"
+      ],
+      "order": [
+        "anthropic"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true
+    }
+  }
+}

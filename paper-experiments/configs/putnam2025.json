@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "source": {
+    "url": "https://github.com/project-numina/numina-lean-agent",
+    "revision": "1c9af8a52e715f22fede766425ba3d3b95526132",
+    "subdirectory": "leanproblems"
+  },
+  "lean_toolchain": "leanprover/lean4:v4.28.0-rc1",
+  "mathlib_revision": "5352afccd6866369be9de43f5b7ec47203555f44",
+  "comparator_revision": "3927ad383f208ae977c340a91c48ac9b497d2097",
+  "exporter_revision": "15f6055e299ad5b89345e533cc2192f4cc00f659",
+  "landrun_revision": "811cfff51ceaf3d9843708aa6d22e9b84ccac8b4",
+  "source_files": {
+    "lakefile.toml": "4ca96568374e83d71039409ebea27ef44b5d403169dad4881c35c0824a93c31e",
+    "lake-manifest.json": "d852c383e8c99b73b535bdbb239d14d28fecc0232ea899a6dec820bb5f35a35e",
+    "lean-toolchain": "e8173aad377a6d70041e5f7a5d8895ed587628f5cab243c53a18c40a1b7b6bf8",
+    "Putnam2025/putnam_2025_a1.lean": "521c95370949f7e8cfc75e8cb1bc8f87522ecefad78b5d223e2a8afee070fdf5",
+    "Putnam2025/putnam_2025_a2.lean": "1d8e44d3c6e99f40db749bf0e969dc843400fa6ec300c75daf37b415041a9594",
+    "Putnam2025/putnam_2025_a3.lean": "3f0c278e43bea7b6f07bb2d4527d775651d1f59dcbd498129bb0be5d826ceb03",
+    "Putnam2025/putnam_2025_a4.lean": "415f9a65cc66ca488f25260fe6f662ebe7eaef5ef02e888a9bcaf021121811bb",
+    "Putnam2025/putnam_2025_a5.lean": "76e49fe402e323d019c746a414726488b630ad9dea5bd96dbc7242851650081d",
+    "Putnam2025/putnam_2025_a6.lean": "0bb269cc657e5eda04c9738ed6c2630358417ac9bd193cffffb041dceab1fbf8",
+    "Putnam2025/putnam_2025_b1.lean": "dc3f2a0eef259625fc504d2e50d94e2215a80d39f603e53ec10501cb4566f60a",
+    "Putnam2025/putnam_2025_b2.lean": "79afb114228b739e1f2cecec7f666897c93e4c12390dd398991a9c4af60a3a4c",
+    "Putnam2025/putnam_2025_b3.lean": "94c2fa83e52c3ea4f57a6d121a8c2fb5f55ddb88f9300075152c358caa61c269",
+    "Putnam2025/putnam_2025_b4.lean": "c49b470ac734bae36d8dacbd5760ed0f667888bac870dc5d7ef06c9417ee5046",
+    "Putnam2025/putnam_2025_b5.lean": "aae9e5981052e80f8cb43ac373964546f1383111422a4c7c2bd6356eae315417",
+    "Putnam2025/putnam_2025_b6.lean": "c9e6be1a7c27df94d9461a2c605a4e5d7d661def14d3b15ac04c284544b9d73f"
+  },
+  "tasks": [
+    {
+      "id": "A1",
+      "source": "Putnam2025/putnam_2025_a1.lean",
+      "declaration": "putnam_2025_a1",
+      "sha256": "521c95370949f7e8cfc75e8cb1bc8f87522ecefad78b5d223e2a8afee070fdf5",
+      "prefix_bytes": 124
+    },
+    {
+      "id": "A2",
+      "source": "Putnam2025/putnam_2025_a2.lean",
+      "declaration": "putnam_2025_a2",
+      "sha256": "1d8e44d3c6e99f40db749bf0e969dc843400fa6ec300c75daf37b415041a9594",
+      "prefix_bytes": 133
+    },
+    {
+      "id": "A3",
+      "source": "Putnam2025/putnam_2025_a3.lean",
+      "declaration": "putnam_2025_a3",
+      "sha256": "3f0c278e43bea7b6f07bb2d4527d775651d1f59dcbd498129bb0be5d826ceb03",
+      "prefix_bytes": 799
+    },
+    {
+      "id": "A4",
+      "source": "Putnam2025/putnam_2025_a4.lean",
+      "declaration": "putnam_2025_a4",
+      "sha256": "415f9a65cc66ca488f25260fe6f662ebe7eaef5ef02e888a9bcaf021121811bb",
+      "prefix_bytes": 124
+    },
+    {
+      "id": "A5",
+      "source": "Putnam2025/putnam_2025_a5.lean",
+      "declaration": "putnam_2025_a5",
+      "sha256": "76e49fe402e323d019c746a414726488b630ad9dea5bd96dbc7242851650081d",
+      "prefix_bytes": 298
+    },
+    {
+      "id": "A6",
+      "source": "Putnam2025/putnam_2025_a6.lean",
+      "declaration": "putnam_2025_a6",
+      "sha256": "0bb269cc657e5eda04c9738ed6c2630358417ac9bd193cffffb041dceab1fbf8",
+      "prefix_bytes": 124
+    },
+    {
+      "id": "B1",
+      "source": "Putnam2025/putnam_2025_b1.lean",
+      "declaration": "putnam_2025_b1",
+      "sha256": "dc3f2a0eef259625fc504d2e50d94e2215a80d39f603e53ec10501cb4566f60a",
+      "prefix_bytes": 147
+    },
+    {
+      "id": "B2",
+      "source": "Putnam2025/putnam_2025_b2.lean",
+      "declaration": "putnam_2025_b2",
+      "sha256": "79afb114228b739e1f2cecec7f666897c93e4c12390dd398991a9c4af60a3a4c",
+      "prefix_bytes": 172
+    },
+    {
+      "id": "B3",
+      "source": "Putnam2025/putnam_2025_b3.lean",
+      "declaration": "putnam_2025_b3",
+      "sha256": "94c2fa83e52c3ea4f57a6d121a8c2fb5f55ddb88f9300075152c358caa61c269",
+      "prefix_bytes": 58
+    },
+    {
+      "id": "B4",
+      "source": "Putnam2025/putnam_2025_b4.lean",
+      "declaration": "putnam_2025_b4",
+      "sha256": "c49b470ac734bae36d8dacbd5760ed0f667888bac870dc5d7ef06c9417ee5046",
+      "prefix_bytes": 1059
+    },
+    {
+      "id": "B5",
+      "source": "Putnam2025/putnam_2025_b5.lean",
+      "declaration": "putnam_2025_b5",
+      "sha256": "aae9e5981052e80f8cb43ac373964546f1383111422a4c7c2bd6356eae315417",
+      "prefix_bytes": 136
+    },
+    {
+      "id": "B6",
+      "source": "Putnam2025/putnam_2025_b6.lean",
+      "declaration": "putnam_2025_b6",
+      "sha256": "c9e6be1a7c27df94d9461a2c605a4e5d7d661def14d3b15ac04c284544b9d73f",
+      "prefix_bytes": 149
+    }
+  ],
+  "lean_interact_version": "0.11.5",
+  "repl_revision": "0bd10273da8a699074308e2b96ff4ec88020b964",
+  "source_lean_toolchain": "leanprover/lean4:v4.26.0",
+  "dependency_manifest": {
+    "version": "1.1.0",
+    "packagesDir": ".lake/packages",
+    "packages": [
+      {
+        "url": "https://github.com/leanprover-community/mathlib4",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "5352afccd6866369be9de43f5b7ec47203555f44",
+        "name": "mathlib",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "v4.28.0-rc1",
+        "inherited": false,
+        "configFile": "lakefile.lean"
+      },
+      {
+        "url": "https://github.com/leanprover-community/plausible",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "7311586e1a56af887b1081d05e80c11b6c41d212",
+        "name": "plausible",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "main",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover-community/LeanSearchClient",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "5ce7f0a355f522a952a3d678d696bd563bb4fd28",
+        "name": "LeanSearchClient",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "main",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover-community/import-graph",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "875ad9d88ed684e39c16bdea260e6ecfa15afd60",
+        "name": "importGraph",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "main",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover-community/ProofWidgets4",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "6d65c6e0a25b8a52c13c3adeb63ecde3bfbb6294",
+        "name": "proofwidgets",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "v0.0.86",
+        "inherited": true,
+        "configFile": "lakefile.lean"
+      },
+      {
+        "url": "https://github.com/leanprover-community/aesop",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "f08e838d4f9aea519f3cde06260cfb686fd4bab0",
+        "name": "aesop",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "master",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover-community/quote4",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "23324752757bf28124a518ec284044c8db79fee5",
+        "name": "Qq",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "master",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover-community/batteries",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover-community",
+        "rev": "cabbb5a025bfbbc50af9184ed2dfdde6ea4f53a7",
+        "name": "batteries",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "main",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      },
+      {
+        "url": "https://github.com/leanprover/lean4-cli",
+        "type": "git",
+        "subDir": null,
+        "scope": "leanprover",
+        "rev": "28e0856d4424863a85b18f38868c5420c55f9bae",
+        "name": "Cli",
+        "manifestFile": "lake-manifest.json",
+        "inputRev": "v4.28.0-rc1",
+        "inherited": true,
+        "configFile": "lakefile.toml"
+      }
+    ],
+    "name": "leanproblems",
+    "lakeDir": ".lake"
+  },
+  "exporter_toolchain": "leanprover/lean4:v4.28.0-rc1",
+  "exporter_source_toolchain": "leanprover/lean4:v4.33.0"
+}

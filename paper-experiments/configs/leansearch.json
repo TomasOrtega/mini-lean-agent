@@ -1,0 +1,8 @@
+{
+  "server_url": "https://leansearch.net",
+  "mathlib_release": "v4.28.0-rc1",
+  "max_results": 6,
+  "timeout": 60,
+  "max_retries": 3,
+  "retry_delay": 2
+}

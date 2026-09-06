@@ -1,0 +1,7 @@
+{
+  "source": "https://github.com/moby/profiles",
+  "revision": "61eaf32614c7c71b60bd8927d3e6a4ffc8ff1f31",
+  "file": "seccomp/default.json",
+  "license": "Apache-2.0",
+  "modification": "Remove all socket, socketpair, and legacy socketcall allowances; preserve other Docker default restrictions."
+}

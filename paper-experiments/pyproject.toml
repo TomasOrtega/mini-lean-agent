@@ -1,0 +1,31 @@
+[project]
+name = "mini-lean-paper-experiments"
+version = "0.1.0"
+description = "Registered Putnam 2025 experiments for mini-Lean-agent"
+requires-python = ">=3.11"
+dependencies = [
+  "mini-lean-agent",
+  "ax-prover",
+  "langgraph-checkpoint-sqlite>=3.0",
+  "langchain-openrouter>=0.2.8",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "pytest-asyncio>=1.0", "ruff>=0.11"]
+
+[tool.uv.sources]
+mini-lean-agent = { path = "..", editable = true }
+ax-prover = { git = "https://github.com/Axiomatic-AI/ax-prover-base.git", rev = "c8e845533d386e198b32fc3f00841fc3e77094c2" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]

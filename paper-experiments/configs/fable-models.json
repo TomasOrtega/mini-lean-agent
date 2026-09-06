@@ -1,0 +1,27 @@
+{
+  "claude-fable-5-1": {
+    "provider": "openrouter",
+    "requested_model": "anthropic/claude-fable-5.1",
+    "mini_model": "openrouter/anthropic/claude-fable-5.1",
+    "max_output_tokens": 128000,
+    "thinking": {
+      "level": "max"
+    },
+    "cache_policy": "disabled",
+    "max_attempts": 3,
+    "request_timeout_seconds": 1800,
+    "canonical_model": "anthropic/claude-fable-5.1-20260831",
+    "context_length": 1000000,
+    "service_tier": "default",
+    "openrouter_provider": {
+      "only": [
+        "anthropic"
+      ],
+      "order": [
+        "anthropic"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true
+    }
+  }
+}

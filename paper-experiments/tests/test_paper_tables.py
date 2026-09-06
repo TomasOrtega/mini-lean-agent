@@ -634,7 +634,11 @@ def test_modern_tables_keep_selected_results_and_count_only_reported_model_spend
     macros = (output / "results.tex").read_text()
     assert r"\newcommand{\PaperAstraCharge}{\$36.00}" in macros
     assert r"\newcommand{\PaperFableAFiveCalls}{2}" in macros
-    assert all(name + "}{%" in macros for name in tables.TABLE_MACROS.values())
+    assert all(
+        name + "}{%" in macros
+        for key, name in tables.TABLE_MACROS.items()
+        if not key.startswith("rq1-")
+    )
     assert macros.count(r"\begin{tabular}") == 7
     result = json.loads((output / "results.json").read_text())
     assert len(result["campaigns"]) == 2
@@ -732,3 +736,52 @@ def test_b3_replacement_requires_its_original_settings_and_prior_declaration():
     manifest["limits"]["low"]["dollars"] = "5"
     with pytest.raises(ValueError, match="limits differ"):
         tables.validate_replacement_manifest(manifest, original)
+
+
+def test_behavior_tables_keep_counts_and_excerpts_in_the_same_two_artifacts(tmp_path):
+    import json
+
+    counts = {
+        "bash_requests": 50,
+        "cat_and_lean_requests": 20,
+        "program_requests": dict.fromkeys(
+            ("text_search", "cat", "sed", "python3", "lean_check", "file_discovery"), 10
+        ),
+    }
+    panel = {
+        "calls": 60,
+        "charge_usd": "1.20",
+        "tokens": {
+            "input": 100,
+            "cache_read": 500,
+            "cache_write": 0,
+            "output": 10,
+            "reasoning": 50,
+        },
+        "roles": {"memory_processor": {"charge_usd": "0.12"}},
+        "runs": [
+            {"stop_reason": "cost", "verified": False, "final_snapshot_rejected_for_sorry": True},
+            {
+                "stop_reason": "infrastructure_failure",
+                "verified": False,
+                "final_snapshot_rejected_for_sorry": True,
+            },
+        ],
+    }
+    model = tables.summarize(dataset(), {}, policy="strict")
+    model["behavior"] = {
+        "mini_shell": {"problems": [{"problem": "A1", **counts}], "totals": counts},
+        "harnesses": {"mini": panel, "axprover": panel},
+        "examples": [{"run_id": "example", "source_sha256": "a" * 64}],
+    }
+    output = tmp_path / "behavior"
+    tables.write_tables(model, output, tables.Evidence())
+    assert {p.name for p in output.iterdir()} == {"results.tex", "results.json"}
+    result = json.loads((output / "results.json").read_text())
+    assert result["behavior"] == model["behavior"]
+    macros = (output / "results.tex").read_text()
+    assert r"\newcommand{\PaperToolUseTable}{%" in macros
+    assert r"\newcommand{\PaperUsageTable}{%" in macros
+    assert r"\newcommand{\PaperMiniCachedInputPercent}{83.3\%}" in macros
+    assert r"\newcommand{\PaperAxAuxiliarySpendPercent}{10.0\%}" in macros
+    assert r"\newcommand{\PaperAxBudgetIncomplete}{1}" in macros

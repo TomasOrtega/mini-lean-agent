@@ -210,6 +210,13 @@ uv run --project paper-experiments python paper-experiments/make_tables.py \
   --budget-policy last-dispatch --output .mini-lean-agent/final-paper-tables
 ```
 
+The same command also reproduces the RQ1 bash-tool counts and model-usage breakdown.
+It uses only the selected Gemini low-budget prefixes, counting each requested
+program family once per bash action; categories overlap and include conditional
+branches. It excludes program names inside file contents and model prose.
+The two output files also retain the accounting totals and provenance for the
+short paper excerpts.
+
 The output directory must be new. `last-dispatch` applies the paper's final-request
 allowance only at a stopping cap; interior checkpoints and call/time limits remain
 strict. `--budget-policy strict` scores the selected attempts without the final-request

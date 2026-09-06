@@ -31,6 +31,7 @@ from .reporting import (
     annotation_statistics,
     read_annotations,
 )
+from .trace_analysis import analyze_traces
 
 POLICIES = ("strict", "last-dispatch")
 NAMES = {"mini": "mini-Lean-agent", "axprover": "AxProverBase"}
@@ -1157,7 +1158,182 @@ TABLE_MACROS = {
     "high-budget-per-problem": "PaperHighBudgetPerProblemTable",
     "high-budget-checkpoints": "PaperHighBudgetCheckpointsTable",
     "charges": "PaperChargesTable",
+    "rq1-tools": "PaperToolUseTable",
+    "rq1-usage": "PaperUsageTable",
 }
+
+
+def rq1_tables(behavior: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
+    shell = behavior["mini_shell"]
+    mini, ax = (behavior["harnesses"][name] for name in ("mini", "axprover"))
+    families = ("text_search", "cat", "sed", "python3", "lean_check", "file_discovery")
+
+    def tool_row(row: dict[str, Any], label: str) -> list[str]:
+        return [
+            label,
+            f"{row['bash_requests']:,}",
+            *[f"{row['program_requests'][key]:,}" for key in families],
+        ]
+
+    def cached(panel: dict[str, Any]) -> str:
+        tokens = panel["tokens"]
+        return (
+            f"{100 * tokens['cache_read'] / (tokens['input'] + tokens['cache_read'] + tokens['cache_write']):.1f}"
+            + r"\%"
+        )
+
+    tables = {
+        "rq1-tools": tabular(
+            [
+                "Problem",
+                "Bash",
+                "Search",
+                r"\texttt{cat}",
+                r"\texttt{sed}",
+                "Python",
+                "Lean",
+                "Find/list",
+            ],
+            [
+                *[tool_row(row, row["problem"]) for row in shell["problems"]],
+                tool_row(shell["totals"], "Total"),
+            ],
+        ),
+        "rq1-usage": tabular(
+            ["Quantity", "mini-Lean-agent", "AxProverBase"],
+            [
+                ["Model calls", *[f"{p['calls']:,}" for p in (mini, ax)]],
+                *[
+                    [label, *[f"{p['tokens'][key] / 1_000_000:.2f}" for p in (mini, ax)]]
+                    for key, label in (
+                        ("input", "Uncached input tokens (M)"),
+                        ("cache_read", "Cached input tokens (M)"),
+                        ("output", "Visible output tokens (M)"),
+                        ("reasoning", "Reasoning tokens (M)"),
+                    )
+                ],
+                ["Cached share of input", cached(mini), cached(ax)],
+                [
+                    "Mean charge per model call",
+                    *[r"\$" + f"{amount(p['charge_usd']) / p['calls']:.4f}" for p in (mini, ax)],
+                ],
+            ],
+        ),
+    }
+    auxiliary_charge = sum(
+        (
+            amount(ax["roles"].get(role, {}).get("charge_usd", "0"))
+            for role in ("memory_processor", "reviewer")
+        ),
+        Decimal(0),
+    )
+    macros = {
+        "PaperMiniBashRequests": f"{shell['totals']['bash_requests']:,}",
+        "PaperMiniCatLeanRequests": f"{shell['totals']['cat_and_lean_requests']:,}",
+        "PaperMiniSearchRequests": str(shell["totals"]["program_requests"]["text_search"]),
+        "PaperMiniCalls": f"{mini['calls']:,}",
+        "PaperAxCalls": f"{ax['calls']:,}",
+        "PaperMiniReasoningMillion": f"{mini['tokens']['reasoning'] / 1_000_000:.2f}",
+        "PaperAxReasoningMillion": f"{ax['tokens']['reasoning'] / 1_000_000:.2f}",
+        "PaperMiniCachedInputPercent": cached(mini),
+        "PaperAxCachedInputPercent": cached(ax),
+        "PaperAxAuxiliarySpendPercent": f"{100 * auxiliary_charge / amount(ax['charge_usd']):.1f}"
+        + r"\%",
+        "PaperAxBudgetIncomplete": str(
+            sum(
+                r["stop_reason"] == "cost"
+                and not r["verified"]
+                and r["final_snapshot_rejected_for_sorry"]
+                for r in ax["runs"]
+            )
+        ),
+    }
+    return tables, macros
+
+
+def rq1_examples(rows: list[dict[str, Any]], evidence: Evidence) -> list[dict[str, Any]]:
+    """Bind the paper's two edited excerpts to their public outputs."""
+    selected = {(r["harness"], r["problem"]): r for r in rows if r["model"] == GEMINI}
+    mini, ax = selected["mini", "A1"], selected["axprover", "B3"]
+    directory = Path(mini["directory"])
+    trajectory_path = directory / "trajectory.json"
+    messages = evidence.read(trajectory_path)["messages"]
+    attempts = evidence.read(directory / "low-endpoint.json")["ledger"]["attempts"]
+    response_id = attempts[20]["response_metadata"]["response_id"]
+    message = next(
+        m for m in messages if m.get("extra", {}).get("response", {}).get("id") == response_id
+    )
+    action = message["extra"]["actions"][0]
+    feedback = next(m for m in messages if m.get("tool_call_id") == action["tool_call_id"])
+    require(
+        "exact?" in action["command"] and "Finset.exists_nat_subset_range t" in feedback["content"],
+        "A1 excerpt changed; review the manuscript",
+    )
+    controller = evidence.read(directory / "controller.json")
+    accepted = next(s for s in controller["snapshots"] if s["verification"].get("verified"))
+    candidate_path = directory / "snapshots" / f"{accepted['index']:06d}" / "candidate.lean"
+    candidate = evidence.bytes(candidate_path, accepted["sha256"]).decode()
+    require(
+        "Finset.exists_nat_subset_range" in candidate,
+        "A1 accepted proof no longer uses the excerpt's lemma",
+    )
+    examples = [
+        {
+            "run_id": mini["run_id"],
+            "attempt_id": attempts[20]["attempt_id"],
+            "source": "trajectory.json",
+            "source_sha256": evidence.files[str(trajectory_path.resolve())],
+            "content": message["content"],
+            "command": action["command"],
+            "feedback": feedback["content"],
+            "accepted_candidate_sha256": accepted["sha256"],
+        }
+    ]
+    directory = Path(ax["directory"])
+    attempts = evidence.read(directory / "low-endpoint.json")["ledger"]["attempts"]
+    for attempt_id in (27, 34, 35, 55):
+        attempt = next(a for a in attempts if a["attempt_id"] == attempt_id)
+        path = Path(attempt["response_metadata"]["response_file"])
+        response = evidence.read(path)["response"]["data"]
+        record = {
+            "run_id": ax["run_id"],
+            "attempt_id": attempt_id,
+            "source": str(path.relative_to(directory)),
+            "source_sha256": evidence.files[str(path.resolve())],
+        }
+        if attempt_id in (27, 34):
+            require(
+                response["response_metadata"]["finish_reason"] == "length",
+                "B3 truncation evidence changed",
+            )
+            try:
+                json.loads(response["content"])
+            except json.JSONDecodeError:
+                record["truncated_json"] = True
+            else:
+                raise ValueError("B3 response is valid JSON; review the manuscript")
+        elif attempt_id == 35:
+            quote = "Responses that exceed output token limits get truncated mid-string (`EOF while parsing a string`), leading to JSON parsing errors and failed builds."
+            require(quote in response["content"], "B3 memory excerpt changed")
+            record["content"] = quote
+        else:
+            code = json.loads(response["content"])["updated_theorem"]
+            lines = code.splitlines()
+            start = next(
+                i
+                for i, line in enumerate(lines)
+                if "have h_modeq : 2025 ^ Nat.totient (n + 2)" in line
+                and "apply Nat.ModEq.of_dvd" in "\n".join(lines[i : i + 3])
+                and "sorry" in "\n".join(lines[i : i + 3])
+            )
+            excerpt = "\n".join(lines[start : start + 3])
+            require(
+                "apply Nat.ModEq.of_dvd" in excerpt and "sorry" in excerpt,
+                "B3 final excerpt changed",
+            )
+            record["code"] = excerpt
+        examples.append(record)
+    return examples
 
 
 def compact_results(model: dict[str, Any], evidence: Evidence) -> dict[str, Any]:
@@ -1226,6 +1402,7 @@ def compact_results(model: dict[str, Any], evidence: Evidence) -> dict[str, Any]
         "campaigns": campaigns,
         "costs": model["costs"],
         "checkpoint_changes": model["checkpoint_changes"],
+        **({"behavior": model["behavior"]} if "behavior" in model else {}),
         "reproducibility": {
             "generator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "validated_file_count": len(evidence.files),
@@ -1346,6 +1523,10 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
             "PaperFableAFiveMinutes",
         }
         macros.update({key: value for key, value in additional_macros.items() if key in used})
+    if "behavior" in model:
+        behavior_tables, behavior_macros = rq1_tables(model["behavior"])
+        tables.update(behavior_tables)
+        macros.update(behavior_macros)
     for path, digest in list(evidence.files.items()):
         evidence.bytes(Path(path), digest)
     lines = ["\\newcommand{\\" + name + "}{" + value + "}" for name, value in macros.items()]
@@ -1427,6 +1608,8 @@ def main() -> None:
         replacements=replacements,
         replacement_annotation=replacement_annotation,
     )
+    model["behavior"] = analyze_traces(model["runs"], evidence)
+    model["behavior"]["examples"] = rq1_examples(model["runs"], evidence)
     add_campaigns(
         model,
         [

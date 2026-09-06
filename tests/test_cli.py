@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from click import unstyle
+from typer import rich_utils
 from typer.testing import CliRunner
 
 from minileanagent import cli
@@ -13,9 +15,16 @@ from minileanagent.cli import app
 runner = CliRunner()
 
 
+@pytest.fixture(params=[False, True], ids=["plain", "colored"])
+def terminal_colors(request, monkeypatch) -> None:
+    monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", request.param)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm")
+
+
 @pytest.mark.parametrize("command", ["solve", "check"])
 def test_commands_require_verification_project(
-    fake_lean_project: tuple[Path, str], monkeypatch, command: str
+    fake_lean_project: tuple[Path, str], monkeypatch, command: str, terminal_colors
 ) -> None:
     project, _ = fake_lean_project
     calls: list[object] = []
@@ -39,8 +48,9 @@ def test_commands_require_verification_project(
         ],
     )
     assert result.exit_code == 2
-    assert "Missing option" in result.output
-    assert "--verification-project" in result.output
+    output = unstyle(result.output)
+    assert "Missing option" in output
+    assert "--verification-project" in output
     assert calls == []
 
 
@@ -184,7 +194,7 @@ def test_solve_returns_failure_for_unverified_result(
 
 @pytest.mark.parametrize("command", ["solve", "check"])
 def test_commands_require_declaration(
-    fake_lean_project: tuple[Path, str], monkeypatch, command: str
+    fake_lean_project: tuple[Path, str], monkeypatch, command: str, terminal_colors
 ) -> None:
     project, _ = fake_lean_project
     calls: list[str] = []
@@ -208,8 +218,9 @@ def test_commands_require_declaration(
         ],
     )
     assert result.exit_code == 2
-    assert "Missing option" in result.output
-    assert "--declaration" in result.output
+    output = unstyle(result.output)
+    assert "Missing option" in output
+    assert "--declaration" in output
     assert calls == []
 
 

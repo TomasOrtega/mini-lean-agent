@@ -64,11 +64,6 @@ jobs:
 
   comparator:
     runs-on: ubuntu-latest
-    env:
-      MINI_LEAN_TEST_COMPARATOR: ${{ runner.temp }}/comparator/.lake/build/bin/comparator
-      COMPARATOR_LEAN4EXPORT: ${{ runner.temp }}/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export
-      # This job checks our own fixtures; production requires upstream's sandbox setup.
-      COMPARATOR_LANDRUN: ${{ runner.temp }}/comparator/scripts/fake-landrun.sh
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: leanprover/lean-action@v1
@@ -88,4 +83,9 @@ jobs:
           cd "$RUNNER_TEMP/comparator"
           lake build lean4export comparator
       - name: Check proofs with the real comparator
+        env:
+          MINI_LEAN_TEST_COMPARATOR: ${{ runner.temp }}/comparator/.lake/build/bin/comparator
+          COMPARATOR_LEAN4EXPORT: ${{ runner.temp }}/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export
+          # This job checks our own fixtures; production requires upstream's sandbox setup.
+          COMPARATOR_LANDRUN: ${{ runner.temp }}/comparator/scripts/fake-landrun.sh
         run: uv run pytest tests/test_comparator_integration.py

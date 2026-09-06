@@ -1,5 +1,7 @@
 # mini-lean-agent
 
+[![CI](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml?query=branch%3Amain)
+
 A thin Lean specialization of [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent).
 Upstream supplies the agent loop, model providers, bash tool, completion command, and trajectories.
 This package adds a Lean prompt, a sequential batch adapter, and verification through

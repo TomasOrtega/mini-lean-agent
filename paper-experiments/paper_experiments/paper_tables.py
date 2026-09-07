@@ -1027,15 +1027,29 @@ def money(value: str | None, known: str | None = None) -> str:
     return r"\textsf{unavailable}"
 
 
-def tabular(headers: list[str], rows: list[list[str]]) -> str:
-    opening = r"\begin{tabular}{@{}l" + "c" * (len(headers) - 1) + "@{}}"
+def tabular(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    alignment: str | None = None,
+    separate_total: bool = False,
+) -> str:
+    alignment = alignment or "l" + "c" * (len(headers) - 1)
+    opening = r"\begin{tabular}{@{}" + alignment + "@{}}"
     return "\n".join(
         [
             opening,
             r"\toprule",
             " & ".join(headers) + r" \\",
             r"\midrule",
-            *[" & ".join(row) + r" \\" for row in rows],
+            *[
+                line
+                for index, row in enumerate(rows)
+                for line in (
+                    *([r"\midrule"] if separate_total and index == len(rows) - 1 else []),
+                    " & ".join(row) + r" \\",
+                )
+            ],
             r"\bottomrule",
             r"\end{tabular}",
             "",
@@ -1051,23 +1065,25 @@ def campaign_money(value: str | None, known: str | None = None) -> str:
     return r"\textsf{unavailable}"
 
 
+def verified_mark(verified: bool) -> str:
+    return r"\PaperVerified{}" if verified else r"\PaperUnverified{}"
+
+
 def campaign_tables(campaigns: list[dict[str, Any]]) -> tuple[dict[str, str], dict[str, str]]:
     tables = {
         "high-budget": tabular(
-            ["Model", "Verified", "Charge", "Charge/proof", "Calls", "Minutes"],
+            ["Model", "Verified", "Charge", "Calls", "Minutes"],
             [
                 [
                     row["display_name"],
                     f"{row['successes']}/12",
                     campaign_money(row["charge_usd"], row["known_charge_usd"]),
-                    campaign_money(
-                        row["charge_per_success_usd"], row["known_charge_per_success_usd"]
-                    ),
                     str(row["calls"]),
                     f"{row['wall_seconds'] / 60:.1f}",
                 ]
                 for row in campaigns
             ],
+            alignment="lcrcc",
         ),
         "high-budget-checkpoints": tabular(
             ["Model", *[r"\$" + str(value) for value in MINI_CAMPAIGN_CHECKPOINTS]],
@@ -1085,7 +1101,10 @@ def campaign_tables(campaigns: list[dict[str, Any]]) -> tuple[dict[str, str], di
     }
     by_problem = [{row["problem"]: row for row in panel["runs"]} for panel in campaigns]
     per_problem = tabular(
-        ["Problem", *[heading for _ in campaigns for heading in ["Result", "USD", "Calls", "Min"]]],
+        [
+            "Problem",
+            *[heading for _ in campaigns for heading in ["Verified", "Charge", "Calls", "Minutes"]],
+        ],
         [
             [
                 problem,
@@ -1093,7 +1112,7 @@ def campaign_tables(campaigns: list[dict[str, Any]]) -> tuple[dict[str, str], di
                     value
                     for mapping in by_problem
                     for value in [
-                        "yes" if mapping[problem]["verified"] else "no",
+                        verified_mark(mapping[problem]["verified"]),
                         campaign_money(
                             mapping[problem]["charge_usd"], mapping[problem]["known_charge_usd"]
                         ),
@@ -1144,7 +1163,7 @@ def campaign_tables(campaigns: list[dict[str, Any]]) -> tuple[dict[str, str], di
                     key + "Charge": campaign_money(row["charge_usd"], row["known_charge_usd"]),
                     key + "Calls": str(row["calls"]),
                     key + "Minutes": f"{row['active_seconds'] / 60:.2f}",
-                    key + "Verified": "yes" if row["verified"] else "no",
+                    key + "Verified": verified_mark(row["verified"]),
                 }
             )
     return tables, macros
@@ -1431,7 +1450,7 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
     by_key = {(r["problem"], r["model"], r["harness"]): r for r in rows}
     tables = {
         "low-budget": tabular(
-            ["Harness", r"\$0.50", r"\$1", r"\$2", "Charge"],
+            ["Harness", r"\$0.50", r"\$1.00", r"\$2.00", "Charge"],
             [
                 [
                     escape(NAMES[p["harness"]]),
@@ -1439,13 +1458,13 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
                         f"{sum(r['checkpoints'][str(b)] for r in rows if r['model'] == GEMINI and r['harness'] == p['harness'])}/12"
                         for b in LOW_CHECKPOINTS
                     ],
-                    money(p["charge_usd"], p["known_charge_usd"]),
+                    campaign_money(p["charge_usd"], p["known_charge_usd"]),
                 ]
                 for p in panels[:2]
             ],
         ),
         "per-problem": tabular(
-            ["Problem", "mini success", "mini charge", "Ax success", "Ax charge"],
+            ["Problem", "mini Verified", "mini Charge", "Ax Verified", "Ax Charge"],
             [
                 [
                     problem,
@@ -1453,7 +1472,7 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
                         value
                         for harness in NAMES
                         for value in [
-                            f"{int(by_key[problem, GEMINI, harness]['checkpoints']['2'])}/1",
+                            verified_mark(by_key[problem, GEMINI, harness]["checkpoints"]["2"]),
                             money(
                                 by_key[problem, GEMINI, harness]["initial_reconciled_charge_usd"],
                                 by_key[problem, GEMINI, harness]["initial_known_charge_usd"],
@@ -1465,12 +1484,12 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
             ],
         ),
         "extended": tabular(
-            ["Task", "Harness", "Verified", "Charge", "Calls", "Hours"],
+            ["Problem", "Harness", "Verified", "Charge", "Calls", "Hours"],
             [
                 [
                     r["problem"],
                     escape(NAMES[r["harness"]]),
-                    "yes" if r["verified"] else "no",
+                    verified_mark(r["verified"]),
                     money(r["final_reconciled_charge_usd"], r["final_known_charge_usd"]),
                     str(r["calls"]),
                     f"{r['active_seconds'] / 3600:.3f}",
@@ -1480,20 +1499,30 @@ def write_tables(model: dict[str, Any], output: Path, evidence: Evidence) -> Non
         ),
     }
     costs = model["costs"]
+    charge_labels = {
+        "Gemini, mini-Lean-agent": "Gemini 3.8 Flash",
+        "Gemini, AxProverBase": "Gemini 3.8 Flash (AxProverBase)",
+    }
     tables["charges"] = tabular(
-        ["Campaign", "Model charge"],
+        ["Model", "Charge"],
         [
             *[
-                [escape(row["display_name"]), money(row["charge_usd"], row["known_charge_usd"])]
+                [
+                    escape(charge_labels.get(row["display_name"], row["display_name"])),
+                    money(row["charge_usd"], row["known_charge_usd"]),
+                ]
                 for row in costs["cohorts"]
             ],
             [
-                "Total reported model charge",
+                "Total",
                 money(costs["reported_model_charge_usd"], costs["known_reported_model_charge_usd"]),
             ],
         ],
+        separate_total=True,
     )
     macros = {
+        "PaperVerified": r"\textcolor{green!50!black}{\ding{51}}",
+        "PaperUnverified": r"\textcolor{red!75!black}{\ding{55}}",
         "PaperMiniSuccesses": str(panels[0]["successes"]),
         "PaperAxSuccesses": str(panels[1]["successes"]),
         "PaperMiniCostPerProof": campaign_money(

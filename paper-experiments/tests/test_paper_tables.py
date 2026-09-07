@@ -457,7 +457,7 @@ def test_replacement_table_uses_selected_rows_only(tmp_path):
     text = (output / "results.tex").read_text()
     assert "2/12" not in text and "1/12" in text
     assert "Excluded billing-error run" not in text
-    assert "Total reported model charge" in text
+    assert r"Total & \$36.300000" in text
     assert "smoke" not in text.lower() and "operating costs" not in text
     result = json.loads((output / "results.json").read_text())
     b2 = [row for row in result["runs"] if row["run_id"] == tables.REPLACEMENT_RUN_ID]
@@ -785,3 +785,38 @@ def test_behavior_tables_keep_counts_and_excerpts_in_the_same_two_artifacts(tmp_
     assert r"\newcommand{\PaperMiniCachedInputPercent}{83.3\%}" in macros
     assert r"\newcommand{\PaperAxAuxiliarySpendPercent}{10.0\%}" in macros
     assert r"\newcommand{\PaperAxBudgetIncomplete}{1}" in macros
+
+
+def test_paper_table_style_and_binary_verification_symbols(tmp_path):
+    model = tables.summarize(dataset(), {}, policy="strict")
+    tables.add_campaigns(
+        model,
+        [
+            tables.summarize_campaign(name, *campaign_fixture(name), policy="strict")
+            for name in ("astra", "fable")
+        ],
+    )
+    output = tmp_path / "styled"
+    tables.write_tables(model, output, tables.Evidence())
+    text = (output / "results.tex").read_text()
+    assert r"Harness & \$0.50 & \$1.00 & \$2.00 & Charge" in text
+    assert r"mini-Lean-agent & 0/12 & 0/12 & 0/12 & \$12.00 \\" in text
+    assert "Problem & mini Verified & mini Charge & Ax Verified & Ax Charge" in text
+    assert "Problem & Harness & Verified & Charge & Calls & Hours" in text
+    assert r"\begin{tabular}{@{}lcrcc@{}}" in text
+    assert "Model & Verified & Charge & Calls & Minutes" in text
+    assert "Charge/proof" not in text
+    assert (
+        "Problem & Verified & Charge & Calls & Minutes & Verified & Charge & Calls & Minutes"
+        in text
+    )
+    assert r"Gemini 3.8 Flash & \$12.000000" in text
+    assert r"Gemini 3.8 Flash (AxProverBase) & \$12.000000" in text
+    assert "\\midrule\nTotal & \\$108.000000" in text
+    assert r"\newcommand{\PaperVerified}{\textcolor{green!50!black}{\ding{51}}}" in text
+    assert r"\newcommand{\PaperUnverified}{\textcolor{red!75!black}{\ding{55}}}" in text
+    assert r"A1 & \PaperUnverified{} & \$1.000000" in text
+    assert r"A1 & \PaperVerified{} & \$3.00" in text
+    assert r"A5 & \PaperUnverified{} & \$3.00" in text
+    assert " & yes & " not in text and " & no & " not in text
+    assert model["campaigns"][0]["successes"] == 11

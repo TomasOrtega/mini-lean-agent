@@ -181,7 +181,7 @@ Docker audit remains a prerequisite for benchmark execution.
 ## Generate the final paper tables
 
 [make_tables.py](make_tables.py) validates frozen inputs and writes exactly two files:
-`results.tex` contains the metrics and seven table macros used by the paper;
+`results.tex` contains the metrics and table macros used by the paper;
 `results.json` contains selected results, campaign costs, and compact reproducibility
 metadata. The generator checks raw evidence hashes without copying the file inventory
 into its output. It does not run models or modify archives. Keep the local records
@@ -226,4 +226,6 @@ The generator selects the completed B6 Ax retry for both low and extended result
 while preserving its archived diagnostic registration. Reported costs count each
 selected attempt once, including continuations, and exclude smoke tests and unselected
 attempts. Copy the two files into `generated/mini-lean-agent`; load `results.tex` once
-and use its `\Paper...Table` commands inside the paper's table floats.
+and use its `\Paper...Table` commands inside the paper's table floats. Load
+`booktabs`, `xcolor`, and `pifont` in the preamble; individual verified outcomes use
+green ticks and red crosses, while aggregate results retain their counts.

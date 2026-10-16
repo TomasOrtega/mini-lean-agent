@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: mini-lean-agent
-message: If you use this software, cite this repository and mini-SWE-agent.
+message: If you use this software, cite the paper below and mini-SWE-agent.
 type: software
 authors:
   - family-names: Ortega
@@ -10,7 +10,34 @@ url: https://github.com/TomasOrtega/mini-lean-agent
 version: 0.2.0
 license: MIT
 date-released: 2026-08-27
+preferred-citation:
+  type: conference-paper
+  title: >-
+    Do Theorem Provers Need Theorem-Proving Agents?
+    mini-Lean-agent: A Coding-Agent Baseline for Lean
+  authors:
+    - family-names: Ortega
+      given-names: Tomas
+    - family-names: Park
+      given-names: Simon
+    - family-names: Khaitan
+      given-names: Ayush
+    - family-names: Fowl
+      given-names: Liam
+    - family-names: Kontorovich
+      given-names: Alex
+    - family-names: Arora
+      given-names: Sanjeev
+  collection-title: 6th Workshop on Mathematical Reasoning and AI (NeurIPS 2026)
+  year: 2026
+  doi: 10.48550/arXiv.2610.17331
+  url: https://arxiv.org/abs/2610.17331v1
 references:
   - type: software
     title: mini-SWE-agent
+    authors:
+      - family-names: Lieret
+        given-names: Kilian
+      - family-names: Jimenez
+        given-names: Carlos E.
     url: https://github.com/SWE-agent/mini-swe-agent

@@ -1,6 +1,7 @@
 # mini-lean-agent
 
 [![CI](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TomasOrtega/mini-lean-agent/actions/workflows/ci.yml?query=branch%3Amain)
+[![DOI](https://img.shields.io/badge/DOI-10.48550%2FarXiv.2610.17331-blue)](https://doi.org/10.48550/arXiv.2610.17331)
 
 A thin Lean specialization of [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent).
 Upstream supplies the agent loop, model providers, bash tool, completion command, and trajectories.
